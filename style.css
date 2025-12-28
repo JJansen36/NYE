@@ -79,7 +79,7 @@
   border: 0;
 
   /* 🔑 DIT IS DE BELANGRIJKSTE REGEL */
-  transform: translateX(-18px);
+  transform: translateX(-120px);
 }
 
 .hint {
