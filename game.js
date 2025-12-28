@@ -6,7 +6,7 @@ const revealBtn = document.getElementById("revealBtn");
 const answerBox = document.getElementById("answer");
 const kidsToggle = document.getElementById("kidsToggle");
 
-// Dummy metadata (later vervangbaar)
+// Demo data (later automatisch)
 const demoMeta = {
   artist: "Onbekende artiest",
   title: "Onbekend nummer",
@@ -16,22 +16,26 @@ const demoMeta = {
 let kidsMode = false;
 
 // Spotify embed laden
-if (trackId && iframe) {
+if (iframe && trackId) {
   iframe.src = `https://open.spotify.com/embed/track/${trackId}`;
 }
 
-// Reveal antwoord
-revealBtn?.addEventListener("click", () => {
-  document.getElementById("artist").innerText = demoMeta.artist;
-  document.getElementById("title").innerText = demoMeta.title;
-  document.getElementById("year").innerText =
-    kidsMode ? "± " + demoMeta.year : demoMeta.year;
+// Reveal knop
+if (revealBtn) {
+  revealBtn.addEventListener("click", () => {
+    document.getElementById("artist").innerText = demoMeta.artist;
+    document.getElementById("title").innerText  = demoMeta.title;
+    document.getElementById("year").innerText   =
+      kidsMode ? "± " + demoMeta.year : demoMeta.year;
 
-  answerBox.classList.remove("hidden");
-});
+    answerBox.classList.remove("hidden");
+  });
+}
 
-// Kids-modus
-kidsToggle?.addEventListener("click", () => {
-  kidsMode = !kidsMode;
-  alert(kidsMode ? "Kids-modus AAN (±2 jaar)" : "Kids-modus UIT");
-});
+// Kids-modus knop
+if (kidsToggle) {
+  kidsToggle.addEventListener("click", () => {
+    kidsMode = !kidsMode;
+    alert(kidsMode ? "Kids-modus AAN (±2 jaar)" : "Kids-modus UIT");
+  });
+}
