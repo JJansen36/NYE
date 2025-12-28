@@ -59,18 +59,22 @@
   cursor: pointer;
 }
 .spotify-mask {
-  width: 100%;
+  width: 64px;              /* precies genoeg voor ronde ▶️ */
   height: 80px;
-  overflow: visible;   /* niets afdekken */
+  overflow: hidden;
   margin: 24px auto;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  border-radius: 32px;      /* mooi rond kader */
+  background: #0b0e1a;
+  box-shadow: 0 0 18px rgba(212,175,55,0.35);
+  position: relative;
 }
 
 .spotify-mask iframe {
-  position: relative;
-  width: 100%;
+  position: absolute;
+  top: 0;
+  right: 0;                 /* 🔑 anker aan rechterkant */
+
+  width: 420px;             /* BREED genoeg voor hele player */
   height: 80px;
   border: 0;
 }
