@@ -58,3 +58,27 @@
   border-radius: 40px;
   cursor: pointer;
 }
+.spotify-mask {
+  width: 70px;          /* alleen play-knop zichtbaar */
+  height: 80px;
+  overflow: hidden;
+  margin: 30px auto;
+  border-radius: 12px;
+  background: #0b0e1a;
+  box-shadow: 0 0 20px rgba(212,175,55,0.4);
+}
+
+/* iframe veel breder maken en verschuiven */
+.spotify-mask iframe {
+  width: 300px;
+  height: 80px;
+  border: none;
+  transform: translateX(-10px); /* fine-tune */
+}
+.hint {
+  margin-top: 20px;
+  color: #ffb703;
+  font-size: 16px;
+  opacity: 0.9;
+  text-align: center;
+}
