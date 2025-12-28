@@ -37,3 +37,14 @@ document.getElementById("kidsToggle").addEventListener("click", () => {
   kidsMode = !kidsMode;
   alert(kidsMode ? "Kids-modus AAN (±2 jaar)" : "Kids-modus UIT");
 });
+
+
+const startOverlay = document.getElementById("startOverlay");
+const startBtn = document.getElementById("startBtn");
+
+startBtn.addEventListener("click", () => {
+  startOverlay.style.display = "none";
+
+  // Spotify embed opnieuw laden = start playback
+  iframe.src = iframe.src;
+});
