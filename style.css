@@ -59,28 +59,27 @@
   cursor: pointer;
 }
 .spotify-mask {
-  width: 76px;            /* venster: alleen play-zone */
-  height: 80px;           /* spotify embed hoogte */
+  width: 72px;              /* zichtbare zone = play knop */
+  height: 80px;
   overflow: hidden;
   margin: 24px auto;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #0b0e1a;
-  box-shadow: 0 0 20px rgba(212,175,55,0.35);
+  box-shadow: 0 0 18px rgba(212,175,55,0.35);
   position: relative;
 }
 
-/* iframe groter dan het venster en dan "schuiven" */
 .spotify-mask iframe {
-  width: 360px;           /* bewust breed */
-  height: 80px;
-  border: 0;
-  display: block;
-
-  /* Dit is de belangrijkste: schuif de player zodat alleen ▶️ zichtbaar blijft */
   position: absolute;
   top: 0;
   left: 0;
-  transform: translate(-14px, 0);  /* <-- FINETUNE X */
+
+  width: 340px;             /* bewust groter dan container */
+  height: 80px;
+  border: 0;
+
+  /* 🔑 DIT IS DE BELANGRIJKSTE REGEL */
+  transform: translateX(-18px);
 }
 
 .hint {
