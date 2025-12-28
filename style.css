@@ -59,7 +59,7 @@
   cursor: pointer;
 }
 .spotify-mask {
-  width: 72px;              /* zichtbare zone = play knop */
+  width: 72px;
   height: 80px;
   overflow: hidden;
   margin: 24px auto;
@@ -74,13 +74,14 @@
   top: 0;
   left: 0;
 
-  width: 340px;             /* bewust groter dan container */
+  width: 360px;
   height: 80px;
   border: 0;
 
-  /* 🔑 DIT IS DE BELANGRIJKSTE REGEL */
-  transform: translateX(-120px);
+  /* 🔑 laat rechterkant (▶️) zien */
+  transform: translateX(-240px);
 }
+
 
 .hint {
   margin-top: 20px;
