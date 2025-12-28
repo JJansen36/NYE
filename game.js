@@ -1,5 +1,10 @@
 const params = new URLSearchParams(window.location.search);
-const trackUrl = params.get("track");
+const trackId = params.get("track");
+
+const trackUrl = trackId
+  ? `https://open.spotify.com/track/${trackId}`
+  : null;
+
 
 const playBtn   = document.getElementById("playBtn");
 const revealBtn = document.getElementById("revealBtn");
@@ -36,3 +41,4 @@ document.getElementById("kidsToggle").addEventListener("click", () => {
   kidsMode = !kidsMode;
   alert(kidsMode ? "Kids-modus AAN (±2 jaar)" : "Kids-modus UIT");
 });
+
