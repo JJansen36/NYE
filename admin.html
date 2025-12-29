@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz — Admin</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="status" class="status"></div>
+  
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="badge">Admin</div>
+      <div class="muted">Beheer & monitoring</div>
+    </div>
+    <div class="topbar-right">
+      <a class="link" href="index.html">Hoofdscherm</a>
+      <a class="link" href="team.html?team=1">Team 1</a>
+      <a class="link" href="team.html?team=2">Team 2</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div id="status" class="status">…</div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>Login</h2>
+        <div class="row">
+          <input id="email" class="input" type="email" placeholder="email" />
+          <input id="password" class="input" type="password" placeholder="password" />
+        </div>
+        <div class="row">
+          <button id="btnLogin" class="btn">Login</button>
+          <button id="btnLogout" class="btn btn-ghost">Logout</button>
+        </div>
+        <p class="muted small">
+          Tip: maak in Supabase een user aan en zet diens UID in de tabel <code>admins</code> (zie README).
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Games</h2>
+        <div class="row">
+          <button id="btnCreateGame" class="btn">Create new game</button>
+          <button id="btnRefresh" class="btn btn-ghost">Refresh</button>
+        </div>
+        <div class="row">
+          <select id="gameSelect" class="input"></select>
+          <button id="btnSetActive" class="btn">Set active</button>
+        </div>
+        <div class="row">
+          <div class="pill">Active: <span id="activeGame">—</span></div>
+          <div class="pill">Selected: <span id="selectedGame">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>Scoreboard</h2>
+        <div class="score-admin">
+          <div class="score-row">
+            <div>
+              <div class="muted">Team 1</div>
+              <div id="t1Score" class="big">0</div>
+            </div>
+            <div class="score-controls">
+              <button data-team="1" data-delta="-1" class="btn btn-ghost">-1</button>
+              <button data-team="1" data-delta="1" class="btn">+1</button>
+              <button data-team="1" data-delta="5" class="btn">+5</button>
+            </div>
+          </div>
+          <div class="score-row">
+            <div>
+              <div class="muted">Team 2</div>
+              <div id="t2Score" class="big">0</div>
+            </div>
+            <div class="score-controls">
+              <button data-team="2" data-delta="-1" class="btn btn-ghost">-1</button>
+              <button data-team="2" data-delta="1" class="btn">+1</button>
+              <button data-team="2" data-delta="5" class="btn">+5</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Current question</h2>
+        <div class="row">
+          <select id="questionSelect" class="input"></select>
+          <button id="btnForceQuestion" class="btn">Force</button>
+        </div>
+        <div class="row">
+          <div class="pill">Now: <span id="currentQ">—</span></div>
+        </div>
+        <div class="muted small" id="currentQText">—</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>Token reset (bij discussie)</h2>
+        <div class="row">
+          <input id="resetToken" class="input" placeholder="token (bijv. a1b2c3d4e5)" />
+          <button id="btnResetToken" class="btn btn-ghost">Reset token</button>
+        </div>
+        <p class="muted small">Reset maakt dat dezelfde QR opnieuw gebruikt kan worden in dezelfde game.</p>
+      </div>
+
+      <div class="card">
+        <h2>Answers (laatste 20)</h2>
+        <div id="answersList" class="list"></div>
+      </div>
+    </div>
+  </div>
+<div id="status" class="status"></div>
+
+
+
+  <div>
+    Active game: <span id="activeGame">—</span>
+    <button id="btnCreateGame">Nieuwe game</button>
+  </div>
+
+  <div id="gamesList"></div>
+
+  <div>
+    <select id="questionsSelect"></select>
+    <button id="btnSetQuestion">Zet huidige vraag</button>
+  </div>
+
+  <div>
+    Team 1:
+    <span id="team1Score">0</span>
+    <button id="btnT1Plus">+</button>
+    <button id="btnT1Min">−</button>
+  </div>
+
+  <div>
+    Team 2:
+    <span id="team2Score">0</span>
+    <button id="btnT2Plus">+</button>
+    <button id="btnT2Min">−</button>
+  </div>
+
+  <div>
+    <input id="tokenReset" placeholder="QR token">
+    <button id="btnResetToken">Reset token</button>
+  </div>
+
+  <div id="answersList"></div>
+
+  <button id="btnLogout">Logout</button>
+</div>
+
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>

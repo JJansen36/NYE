@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz — Team</title>
+
+  <link rel="stylesheet" href="css/styles.css" />
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- QR scanner -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="badge">Team</div>
+      <div id="teamLabel" class="title">…</div>
+    </div>
+    <div class="topbar-right">
+      <a class="link" href="index.html">Hoofdscherm</a>
+      <a class="link" href="admin.html">Admin</a>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="container">
+
+    <!-- STATUS -->
+    <div id="status" class="status">Laden…</div>
+
+    <!-- INFO -->
+    <div class="muted small">
+      Game: <span id="gameLabel">—</span>
+    </div>
+
+    <div class="grid2">
+
+      <!-- LINKER KAART: QR / TOKEN -->
+      <div class="card">
+        <h2>Scan QR / Token</h2>
+
+        <p class="muted">
+          Scan een QR-code of plak een token.  
+          De QR bepaalt automatisch de vraag en categorie.
+        </p>
+
+        <div class="row">
+          <button class="btn" id="btnStartQR">Start camera</button>
+          <button class="btn ghost" id="btnStopQR" disabled>Stop camera</button>
+        </div>
+
+        <!-- QR -->
+        <div id="qrBox" class="qr-box hidden">
+          <div id="qrReader"></div>
+          <div id="qrStatus" class="muted small"></div>
+        </div>
+
+        <!-- TOKEN INPUT -->
+        <div class="row">
+          <input
+            id="tokenInput"
+            class="input"
+            placeholder="Token of URL met ?token=..."
+          />
+          <button class="btn" id="btnUse">Gebruik</button>
+        </div>
+
+        <div id="usedNote" class="muted small"></div>
+
+        <!-- OPEN VRAAG -->
+        <textarea
+          id="answerInput"
+          class="textarea"
+          rows="3"
+          placeholder="Open vraag? Vul hier je antwoord in (optioneel)"
+        ></textarea>
+      </div>
+
+      <!-- RECHTER KAART: HUIDIGE VRAAG -->
+      <div class="card">
+        <h2>Huidige vraag</h2>
+
+        <div class="question">
+          <div class="pill" id="qCategory">—</div>
+          <div id="qText" class="qText">Nog geen vraag actief.</div>
+          <div id="qMedia" class="media"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="muted small">
+          <strong>Laatste token:</strong>
+          <span id="lastToken">—</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SCRIPT -->
+  <script type="module" src="js/team.js"></script>
+</body>
+</html>

@@ -1,26 +1,55 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="nl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NYE Timeline – Scan</title>
-
-  <link rel="stylesheet" href="style.css">
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz — Hoofdscherm</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<div class="app">
-  <h1>🎆 NYE TIMELINE</h1>
-  <p class="subtitle">Scan een kaart om te starten</p>
 
-  <div id="scanner"></div>
-
-  <div class="scan-hint">
-    Richt je camera op de QR-code
-  </div>
+  <div id="activeQuestion" class="active-question">
+  <div id="activeCategory" class="muted"></div>
+  <h2 id="activeQuestionText">Wachten op vraag…</h2>
 </div>
 
-<script src="scan.js"></script>
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="badge">Hoofdscherm</div>
+      <div id="status" class="status">...</div>
+    </div>
+    <div class="topbar-right">
+      <select id="gameSelect" class="input" style="min-width: 220px"></select>
+      <button id="btnUseGame" class="btn">Use game</button>
+      <a class="btn" href="admin.html">Admin</a>
+    </div>
+  </div>
+
+  <div class="layout-tv">
+    <section class="side-panel">
+      <div class="team-title" id="team1Name">Team 1</div>
+      <div class="score" id="team1Score">0</div>
+    </section>
+
+    <main class="center-panel">
+      <div class="question-meta">
+        <span class="pill" id="catPill">—</span>
+        <span class="muted" id="qId">—</span>
+      </div>
+      <div class="question" id="questionText">Wacht op actieve vraag…</div>
+      <div class="muted" id="mediaUrl"></div>
+      <div class="divider"></div>
+      <div class="muted" id="hint">Tip: laat admin een game activeren en laat teams QR’s scannen.</div>
+    </main>
+
+    <section class="side-panel">
+      <div class="team-title" id="team2Name">Team 2</div>
+      <div class="score" id="team2Score">0</div>
+    </section>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
