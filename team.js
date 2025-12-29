@@ -1,234 +1,189 @@
-import { sb, requireConfig } from './supabaseClient.js';
-import { qs, setStatus, prettyUUID, asToken } from './utils.js';
-import { AUTO_START_QR } from './config.js';
+import { sb } from './supabaseClient.js';
+import { qs, setStatus, asToken } from './utils.js';
 
-let gameId = null;
 let teamId = null;
-let qr = null;
+let gameId = null;
+let html5QrCode = null;
 
+// ==========================
+// ELEMENTEN
+// ==========================
 const el = {
   status: document.getElementById('status'),
   teamLabel: document.getElementById('teamLabel'),
   gameLabel: document.getElementById('gameLabel'),
-  tokenInput: document.getElementById('tokenInput'),
-  answerInput: document.getElementById('answerInput'),
-  btnUse: document.getElementById('btnUse'),
+
   btnStartQR: document.getElementById('btnStartQR'),
   btnStopQR: document.getElementById('btnStopQR'),
   qrBox: document.getElementById('qrBox'),
-  qrStatus: document.getElementById('qrStatus'),
+  qrReader: document.getElementById('qrReader'),
+
+  tokenInput: document.getElementById('tokenInput'),
+  btnUse: document.getElementById('btnUse'),
+  usedNote: document.getElementById('usedNote'),
+
+  answerInput: document.getElementById('answerInput'),
+
   qCategory: document.getElementById('qCategory'),
   qText: document.getElementById('qText'),
   qMedia: document.getElementById('qMedia'),
-  usedNote: document.getElementById('usedNote'),
 };
 
-function must(val, name) {
-  if (!val) throw new Error(`Missing ${name} in URL (tip: ?team=1&game=... )`);
-  return val;
-}
+// ==========================
+// INIT
+// ==========================
+document.addEventListener('DOMContentLoaded', init);
 
-async function init() {
-  try {
-    requireConfig();
+function init() {
+  console.log('team.js loaded');
 
-    teamId = parseInt(must(qs('team'), 'team'), 10);
-    gameId = must(qs('game'), 'game');
+  teamId = qs('team');
+  gameId = qs('game');
 
-    el.teamLabel.textContent = `Team ${teamId}`;
-    el.gameLabel.textContent = prettyUUID(gameId);
-
-    // if token already in URL: auto use
-    const t = qs('token');
-    if (t) {
-      el.tokenInput.value = asToken(t);
-      await useToken();
-    }
-
-    el.btnUse.addEventListener('click', useToken);
-    el.btnStartQR.addEventListener('click', startQR);
-    el.btnStopQR.addEventListener('click', stopQR);
-
-    if (AUTO_START_QR) startQR();
-
-    setStatus(el.status, 'Klaar — scan een QR of plak een token.', '');
-  } catch (e) {
-    console.error(e);
-    setStatus(el.status, e.message || String(e), 'bad');
-  }
-}
-
-function renderMedia(url) {
-  el.qMedia.innerHTML = '';
-  if (!url) return;
-
-  // Spotify embed if it looks like spotify:track or open.spotify.com
-  if (url.startsWith('spotify:track:')) {
-    const id = url.split(':').pop();
-    const iframe = document.createElement('iframe');
-    iframe.src = `https://open.spotify.com/embed/track/${id}`;
-    iframe.allow = 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture';
-    iframe.loading = 'lazy';
-    iframe.style.width = '100%';
-    iframe.style.height = '152px';
-    iframe.style.border = '0';
-    el.qMedia.appendChild(iframe);
+  if (!teamId || !gameId) {
+    setStatus(el.status, 'Missing team of game in URL', 'bad');
     return;
   }
 
-  if (url.includes('open.spotify.com/track/')) {
-    const trackId = url.split('/track/')[1]?.split('?')[0];
-    if (trackId) {
-      const iframe = document.createElement('iframe');
-      iframe.src = `https://open.spotify.com/embed/track/${trackId}`;
-      iframe.allow = 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture';
-      iframe.loading = 'lazy';
-      iframe.style.width = '100%';
-      iframe.style.height = '152px';
-      iframe.style.border = '0';
-      el.qMedia.appendChild(iframe);
-      return;
-    }
+  el.teamLabel.textContent = `Team ${teamId}`;
+  el.gameLabel.textContent = gameId;
+
+  bindEvents();
+  subscribeToCurrentQuestion();
+
+  // auto token uit URL
+  const urlToken = qs('token');
+  if (urlToken) {
+    useToken(urlToken);
   }
 
-  // otherwise treat as image/url
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  a.textContent = url;
-  a.className = 'link';
+  setStatus(el.status, 'Klaar om te scannen of token te plakken');
+}
 
-  // if image-ish, show preview
-  if (url.match(/\.(png|jpg|jpeg|webp|gif)(\?.*)?$/i)) {
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = 'media';
-    img.className = 'media-img';
-    el.qMedia.appendChild(img);
-  } else {
-    el.qMedia.appendChild(a);
+// ==========================
+// EVENTS
+// ==========================
+function bindEvents() {
+  if (el.btnStartQR) {
+    el.btnStartQR.type = 'button';
+    el.btnStartQR.disabled = false;
+    el.btnStartQR.onclick = () => {
+      console.log('Start camera clicked');
+      startQR();
+    };
+  }
+
+  if (el.btnStopQR) {
+    el.btnStopQR.type = 'button';
+    el.btnStopQR.onclick = stopQR;
+  }
+
+  if (el.btnUse) {
+    el.btnUse.type = 'button';
+    el.btnUse.onclick = () => {
+      const t = asToken(el.tokenInput.value);
+      if (t) useToken(t);
+    };
   }
 }
 
-async function useToken() {
-  try {
-    const token = asToken(el.tokenInput.value);
-    if (!token) {
-      setStatus(el.status, 'Plak een token of scan een QR.', 'bad');
-      return;
-    }
-
-    setStatus(el.status, 'Token verwerken…', '');
-    el.usedNote.textContent = '';
-
-    const answerText = (el.answerInput.value || '').trim() || null;
-
-    const { data, error } = await sb.rpc('rpc_team_use_token', {
-      p_game_id: gameId,
-      p_team_id: teamId,
-      p_token: token,
-      p_answer_text: answerText,
-    });
-
-    if (error) throw error;
-
-    if (!data?.ok) {
-      setStatus(el.status, 'Deze QR is in dit spel al gebruikt. (Admin kan resetten)', 'bad');
-      el.usedNote.textContent = `Token gebruikt: ${token}`;
-    } else {
-      setStatus(el.status, 'Vraag geopend op hoofdscherm ✅', 'good');
-    }
-
-    // fetch question and render
-    const qid = data?.question_id;
-    if (qid) {
-      const { data: q, error: qErr } = await sb
-        .from('questions')
-        .select('id, question_text, media_url, duration_sec, categories(name, icon)')
-        .eq('id', qid)
-        .single();
-
-      if (qErr) throw qErr;
-
-      const icon = q.categories?.icon || '';
-      const name = q.categories?.name || '';
-      el.qCategory.textContent = `${icon} ${name}`.trim();
-      el.qText.textContent = q.question_text;
-      renderMedia(q.media_url);
-    }
-
-    // stop scanner after successful scan
-    if (qr) stopQR();
-  } catch (e) {
-    console.error(e);
-    setStatus(el.status, e.message || String(e), 'bad');
-  }
-}
-
+// ==========================
+// QR SCANNER
+// ==========================
 async function startQR() {
   if (!window.Html5Qrcode) {
-    setStatus(el.status, 'QR scanner niet beschikbaar', 'bad');
+    setStatus(el.status, 'QR library niet geladen', 'bad');
     return;
   }
 
-  if (html5QrCode) {
-    await html5QrCode.stop().catch(() => {});
-  }
-
-  html5QrCode = new Html5Qrcode("qrReader");
-
-  const config = {
-    fps: 10,
-    qrbox: { width: 250, height: 250 }
-  };
-
   try {
+    if (html5QrCode) {
+      await html5QrCode.stop().catch(() => {});
+    }
+
+    html5QrCode = new Html5Qrcode('qrReader');
+
     const cameras = await Html5Qrcode.getCameras();
+    console.log('Cameras:', cameras);
 
-    // probeer achtercamera te vinden
-    const backCam =
-      cameras.find(c => /back|rear|environment/i.test(c.label)) ||
-      cameras[cameras.length - 1]; // fallback: laatste camera
+    let cam = cameras.find(c =>
+      /back|rear|environment/i.test(c.label)
+    );
 
-    console.log('Gekozen camera:', backCam);
+    if (!cam) cam = cameras[cameras.length - 1];
+
+    console.log('Gekozen camera:', cam);
 
     await html5QrCode.start(
-      { deviceId: { exact: backCam.id } }, // ⬅️ DEVICE-ID
-      config,
+      { deviceId: { exact: cam.id } },
+      {
+        fps: 10,
+        qrbox: { width: 250, height: 250 }
+      },
       onScanSuccess,
-      onScanFailure
+      () => {}
     );
 
     el.qrBox.classList.remove('hidden');
     el.btnStartQR.disabled = true;
     el.btnStopQR.disabled = false;
 
+    setStatus(el.status, 'Camera actief – scan een QR');
+
   } catch (err) {
-    console.error('Camera start mislukt', err);
-    setStatus(el.status, 'Camera niet beschikbaar', 'bad');
+    console.error(err);
+    setStatus(el.status, 'Camera kon niet starten', 'bad');
   }
 }
 
-
-
 async function stopQR() {
-  try {
-    if (qr) {
-      const state = qr.getState?.();
-      if (state === 2 || state === 'SCANNING') {
-        await qr.stop();
-      }
-      await qr.clear();
-    }
-  } catch (_) {}
+  if (!html5QrCode) return;
+  await html5QrCode.stop().catch(() => {});
+  html5QrCode = null;
 
-  el.qrBox.classList.add('hidden');
-  el.qrStatus.textContent = '';
+  el.btnStartQR.disabled = false;
+  el.btnStopQR.disabled = true;
+
+  setStatus(el.status, 'Camera gestopt');
 }
 
-init();
+function onScanSuccess(decodedText) {
+  console.log('QR scanned:', decodedText);
+  stopQR();
+  useToken(decodedText);
+}
 
+// ==========================
+// TOKEN GEBRUIKEN
+// ==========================
+async function useToken(raw) {
+  const token = asToken(raw);
+  if (!token) return;
+
+  setStatus(el.status, 'Token verwerken…');
+
+  const { error } = await sb.rpc('rpc_team_use_token', {
+    p_game_id: gameId,
+    p_team_id: Number(teamId),
+    p_token: token,
+    p_answer: el.answerInput?.value || null
+  });
+
+  if (error) {
+    console.error(error);
+    setStatus(el.status, error.message, 'bad');
+    return;
+  }
+
+  el.usedNote.textContent = `Laatste token: ${token}`;
+  el.tokenInput.value = '';
+
+  setStatus(el.status, 'Token geaccepteerd ✔');
+}
+
+// ==========================
+// REALTIME VRAAG
+// ==========================
 function subscribeToCurrentQuestion() {
   sb.channel(`team_game_${gameId}`)
     .on(
@@ -253,9 +208,26 @@ function subscribeToCurrentQuestion() {
 
         el.qCategory.textContent =
           `${q.categories?.icon || ''} ${q.categories?.name || ''}`.trim();
+
         el.qText.textContent = q.question_text;
         renderMedia(q.media_url);
       }
     )
     .subscribe();
+}
+
+function renderMedia(url) {
+  el.qMedia.innerHTML = '';
+  if (!url) return;
+
+  if (url.includes('spotify')) {
+    const iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.allow = 'autoplay; encrypted-media';
+    el.qMedia.appendChild(iframe);
+  } else if (url.match(/\.(jpg|png|jpeg|webp)$/i)) {
+    const img = document.createElement('img');
+    img.src = url;
+    el.qMedia.appendChild(img);
+  }
 }
