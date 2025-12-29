@@ -34,16 +34,13 @@
     .muted { color: #9ca3af; }
   </style>
 
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <!-- QR scanner -->
   <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
 </head>
 <body>
 
 <div class="box">
-  <h2 id="title">QR scannen</h2>
+  <h2>QR scannen</h2>
 
   <div id="status" class="muted">Klaar om te scannen</div>
 
@@ -52,86 +49,103 @@
   <div id="qrReader"></div>
 </div>
 
-<script type="module">
-  import { SUPABASE_URL, SUPABASE_ANON_KEY } from './js/config.js';
+<script>
+console.log("scan.html geladen");
 
-  const sb = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-  );
+const EDGE_URL =
+  "https://wjvleduvvjjseunakmcb.functions.supabase.co/clever-api";
 
-  const statusEl = document.getElementById('status');
-  const btnScan = document.getElementById('btnScan');
-  const titleEl = document.getElementById('title');
+const statusEl = document.getElementById("status");
+const btnScan = document.getElementById("btnScan");
 
-  // 👉 TEAM ID UIT URL
-  const params = new URLSearchParams(window.location.search);
-  const teamId = params.get('team');
+let qr = null;
 
-  if (teamId) {
-    titleEl.textContent = `QR scannen – Team ${teamId}`;
-  }
+function setStatus(msg, cls = "muted") {
+  statusEl.className = cls;
+  statusEl.textContent = msg;
+}
 
-  let qr = null;
+async function registerCode(code) {
+  console.log("➡️ Verstuur naar Edge Function:", code);
+  setStatus("⏳ Code verwerken…");
 
-  function setStatus(msg, cls = 'muted') {
-    statusEl.className = cls;
-    statusEl.textContent = msg;
-  }
+  try {
+    const res = await fetch(EDGE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ code })
+    });
 
-  async function registerCode(code) {
-    setStatus(`Code ${code} opslaan…`);
+    console.log("⬅️ Response status:", res.status);
 
-    const { error } = await sb
-      .from('scan_events')
-      .insert({
-        code,
-        team_id: teamId ? Number(teamId) : null
-      });
+    const text = await res.text();
+    console.log("⬅️ Response body:", text);
 
-    if (error) {
-  console.error("Supabase error:", error);
-  setStatus(`❌ ${error.message}`, 'bad');
-} else {
-      setStatus(`✅ Code ${code} geregistreerd`, 'ok');
-    }
-  }
-
-  btnScan.onclick = async () => {
+    let data = {};
     try {
-      setStatus('Camera starten…');
-
-      qr = new Html5Qrcode('qrReader');
-
-      await qr.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: 250 },
-        async (text) => {
-          console.log('Gescand:', text);
-
-          await qr.stop();
-          qr.clear();
-
-          const code = text.trim();
-          registerCode(code);
-        }
-      );
-
-      setStatus('Scan een QR-code');
-
-    } catch (err) {
-      console.error(err);
-      setStatus('❌ Camera niet beschikbaar', 'bad');
+      data = JSON.parse(text);
+    } catch (e) {
+      // geen JSON → ok voor debug
     }
-  };
 
-  // 🔁 fallback: code via URL
-  const codeFromUrl = params.get('code');
-  if (codeFromUrl) {
-    registerCode(codeFromUrl);
+    if (!res.ok) {
+      setStatus("❌ Opslaan mislukt", "bad");
+      return;
+    }
+
+    if (data.track) {
+      setStatus(
+        `✅ ${data.track}`,
+        "ok"
+      );
+    } else {
+      setStatus("✅ Code verwerkt", "ok");
+    }
+
+  } catch (err) {
+    console.error("❌ Fetch error:", err);
+    setStatus("❌ Netwerkfout", "bad");
   }
+}
+
+btnScan.onclick = async () => {
+  try {
+    setStatus("📷 Camera starten…");
+
+    qr = new Html5Qrcode("qrReader");
+
+    await qr.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      async (text) => {
+        await qr.stop();
+        qr.clear();
+
+        const code = text.trim();
+        console.log("QR gescand:", code);
+
+        registerCode(code);
+      }
+    );
+
+    setStatus("Scan een QR-code");
+
+  } catch (err) {
+    console.error(err);
+    setStatus("❌ Camera niet beschikbaar", "bad");
+  }
+};
+
+// 🔁 fallback: ?code=433
+const params = new URLSearchParams(window.location.search);
+const codeFromUrl = params.get("code");
+if (codeFromUrl) {
+  console.log("Fallback code via URL:", codeFromUrl);
+  registerCode(codeFromUrl);
+}
 </script>
 
 </body>
 </html>
-
