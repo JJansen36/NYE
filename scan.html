@@ -3,125 +3,56 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>QR Scan</title>
+  <title>QR scannen</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
     body {
-      font-family: system-ui, sans-serif;
-      background: #0f0f14;
-      color: #fff;
-      margin: 0;
-      padding: 24px;
-      text-align: center;
+      background:#0f0f14;
+      color:#fff;
+      font-family:system-ui;
+      text-align:center;
+      padding:20px;
     }
-    .box {
-      max-width: 360px;
-      margin: 0 auto;
+    #reader {
+      width:300px;
+      margin:20px auto;
     }
     button {
-      padding: 12px 18px;
-      font-size: 16px;
-      margin-top: 12px;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
+      padding:12px 18px;
+      border-radius:8px;
+      border:none;
+      font-size:16px;
     }
-    #qrReader {
-      margin-top: 16px;
-    }
-    .ok { color: #4ade80; }
-    .bad { color: #f87171; }
-    .muted { color: #9ca3af; }
   </style>
-
-  <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
 </head>
 <body>
 
-<div class="box">
-  <h2>QR scannen</h2>
-  <div id="status" class="muted">Klaar om te scannen</div>
-  <button id="btnScan" type="button">📷 Scan QR-code</button>
-  <div id="qrReader"></div>
-</div>
+<h1>QR scannen</h1>
+
+<button id="start">📷 Scan QR-code</button>
+<div id="reader"></div>
+<p id="result"></p>
 
 <script>
-console.log("scan.html geladen");
+let scanner;
 
-const EDGE_URL =
-  "https://wjvleduvvjjseunakmcb.functions.supabase.co/clever-api";
+document.getElementById("start").onclick = () => {
+  scanner = new Html5Qrcode("reader");
 
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
-
-const statusEl = document.getElementById("status");
-const btnScan = document.getElementById("btnScan");
-let qr = null;
-
-function setStatus(msg, cls = "muted") {
-  statusEl.className = cls;
-  statusEl.textContent = msg;
-}
-
-async function registerCode(code) {
-  console.log("➡️ Verstuur naar Edge Function:", code);
-  setStatus("⏳ Code verwerken…");
-
-  try {
-    const res = await fetch(EDGE_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${SUPABASE_ANON_KEY}` // ✅ DIT WAS DE MISSENDE REGEL
-      },
-      body: JSON.stringify({ code })
-    });
-
-    const data = await res.json();
-    console.log("⬅️ Response:", data);
-
-    if (!res.ok) {
-      setStatus("❌ Opslaan mislukt", "bad");
-      return;
-    }
-
-    setStatus(
-      `✅ ${data.spotify_track?.title ?? "Code verwerkt"}`,
-      "ok"
-    );
-
-  } catch (err) {
-    console.error(err);
-    setStatus("❌ Netwerkfout", "bad");
-  }
-}
-
-btnScan.onclick = async () => {
-  try {
-    setStatus("📷 Camera starten…");
-    qr = new Html5Qrcode("qrReader");
-
-    await qr.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
-      async (text) => {
-        await qr.stop();
-        qr.clear();
-        registerCode(text.trim());
-      }
-    );
-
-    setStatus("Scan een QR-code");
-  } catch {
-    setStatus("❌ Camera niet beschikbaar", "bad");
-  }
+  scanner.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    (text) => {
+      document.getElementById("result").innerText = "Gescand: " + text;
+      scanner.stop();
+    },
+    (err) => {}
+  );
 };
-
-// fallback: ?code=spotify-url
-const params = new URLSearchParams(window.location.search);
-const codeFromUrl = params.get("code");
-if (codeFromUrl) registerCode(codeFromUrl);
 </script>
 
 </body>
 </html>
+
