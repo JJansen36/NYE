@@ -76,17 +76,19 @@ async function registerCode(rawText) {
 
   try {
     const res = await fetch(EDGE_URL, {
-      method: "POST",
-      headers: {
+    method: "POST",
+    headers: {
         "Content-Type": "application/json",
+        "apikey": SUPABASE_ANON_KEY,
         "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-      },
-      body: JSON.stringify({
+    },
+    body: JSON.stringify({
         code: code,
         spotify_url: code,
         url: code
-      })
+    })
     });
+
 
     const data = await res.json();
     console.log("⬅️ Response van Edge:", data);
