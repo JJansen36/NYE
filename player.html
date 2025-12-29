@@ -43,9 +43,23 @@
 const sb = supabase.createClient(
   "https://qejxwoxaurbwllihnvim.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
-);
+
+  );
 
   let currentCode = null;
+
+  function toSpotifyEmbed(url) {
+    if (!url) return null;
+
+    if (url.includes("open.spotify.com/track/")) {
+      return url.replace(
+        "open.spotify.com/track/",
+        "open.spotify.com/embed/track/"
+      );
+    }
+
+    return url;
+  }
 
   async function loadLatest() {
     const { data, error } = await sb
@@ -55,38 +69,26 @@ const sb = supabase.createClient(
       .limit(1)
       .single();
 
-    if (error) {
-      console.error("Supabase error:", error);
-      return;
-    }
+    if (error || !data?.code) return;
 
-    if (!data?.code) {
-      console.warn("Geen code gevonden");
-      return;
-    }
-
-    // voorkom opnieuw laden van dezelfde link
     if (data.code === currentCode) return;
 
     currentCode = data.code;
 
-    const container = document.getElementById("container");
+    const embedUrl = toSpotifyEmbed(data.code);
 
-    container.innerHTML = `
+    document.getElementById("container").innerHTML = `
       <iframe
-        src="${data.code}"
+        src="${embedUrl}"
         allow="autoplay; fullscreen; encrypted-media"
         allowfullscreen
       ></iframe>
     `;
 
-    console.log("▶️ Nieuwe link afgespeeld:", data.code);
+    console.log("▶️ Nu spelend:", embedUrl);
   }
 
-  // eerste load
   loadLatest();
-
-  // elke 3 sec checken
   setInterval(loadLatest, 3000);
 </script>
 
