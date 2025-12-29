@@ -34,18 +34,14 @@
     .muted { color: #9ca3af; }
   </style>
 
-  <!-- QR scanner -->
   <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
 </head>
 <body>
 
 <div class="box">
   <h2>QR scannen</h2>
-
   <div id="status" class="muted">Klaar om te scannen</div>
-
   <button id="btnScan" type="button">📷 Scan QR-code</button>
-
   <div id="qrReader"></div>
 </div>
 
@@ -55,9 +51,11 @@ console.log("scan.html geladen");
 const EDGE_URL =
   "https://wjvleduvvjjseunakmcb.functions.supabase.co/clever-api";
 
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
+
 const statusEl = document.getElementById("status");
 const btnScan = document.getElementById("btnScan");
-
 let qr = null;
 
 function setStatus(msg, cls = "muted") {
@@ -73,39 +71,27 @@ async function registerCode(code) {
     const res = await fetch(EDGE_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}` // ✅ DIT WAS DE MISSENDE REGEL
       },
       body: JSON.stringify({ code })
     });
 
-    console.log("⬅️ Response status:", res.status);
-
-    const text = await res.text();
-    console.log("⬅️ Response body:", text);
-
-    let data = {};
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      // geen JSON → ok voor debug
-    }
+    const data = await res.json();
+    console.log("⬅️ Response:", data);
 
     if (!res.ok) {
       setStatus("❌ Opslaan mislukt", "bad");
       return;
     }
 
-    if (data.track) {
-      setStatus(
-        `✅ ${data.track}`,
-        "ok"
-      );
-    } else {
-      setStatus("✅ Code verwerkt", "ok");
-    }
+    setStatus(
+      `✅ ${data.spotify_track?.title ?? "Code verwerkt"}`,
+      "ok"
+    );
 
   } catch (err) {
-    console.error("❌ Fetch error:", err);
+    console.error(err);
     setStatus("❌ Netwerkfout", "bad");
   }
 }
@@ -113,7 +99,6 @@ async function registerCode(code) {
 btnScan.onclick = async () => {
   try {
     setStatus("📷 Camera starten…");
-
     qr = new Html5Qrcode("qrReader");
 
     await qr.start(
@@ -122,29 +107,20 @@ btnScan.onclick = async () => {
       async (text) => {
         await qr.stop();
         qr.clear();
-
-        const code = text.trim();
-        console.log("QR gescand:", code);
-
-        registerCode(code);
+        registerCode(text.trim());
       }
     );
 
     setStatus("Scan een QR-code");
-
-  } catch (err) {
-    console.error(err);
+  } catch {
     setStatus("❌ Camera niet beschikbaar", "bad");
   }
 };
 
-// 🔁 fallback: ?code=433
+// fallback: ?code=spotify-url
 const params = new URLSearchParams(window.location.search);
 const codeFromUrl = params.get("code");
-if (codeFromUrl) {
-  console.log("Fallback code via URL:", codeFromUrl);
-  registerCode(codeFromUrl);
-}
+if (codeFromUrl) registerCode(codeFromUrl);
 </script>
 
 </body>
