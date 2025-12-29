@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      height: 100%;
+      width: 100%;
+    }
+
+    iframe {
+      width: 100vw;
+      height: 100vh;
+      border: none;
+    }
+
+    .empty {
+      color: #aaa;
+      font-family: sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+
+<div id="container" class="empty">
+  Wachten op scan…
+</div>
+
+<script>
+  const sb = supabase.createClient(
+    "https://JOUW_PROJECT_ID.supabase.co",
+    "JOUW_PUBLIC_ANON_KEY"
+  );
+
+  async function loadLatestLink() {
+    const { data, error } = await sb
+      .from("scans")
+      .select("link")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !data?.link) {
+      console.warn("Geen link gevonden");
+      return;
+    }
+
+    const container = document.getElementById("container");
+
+    container.innerHTML = `
+      <iframe
+        src="${data.link}"
+        allow="autoplay; fullscreen; encrypted-media"
+        allowfullscreen
+      ></iframe>
+    `;
+  }
+
+  // eerste load
+  loadLatestLink();
+
+  // elke 5 seconden checken of er iets nieuws is
+  setInterval(loadLatestLink, 5000);
+</script>
+
+</body>
+</html>
