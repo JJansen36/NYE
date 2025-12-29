@@ -22,6 +22,14 @@
       border: none;
     }
 
+    iframe {
+  width: 100vw;
+  height: 100vh;
+  border: 5px solid red; /* test */
+  background: white;
+}
+
+
     .empty {
       color: #aaa;
       font-family: system-ui, sans-serif;
@@ -43,6 +51,7 @@
 const sb = supabase.createClient(
   "https://wjvleduvvjjseunakmcb.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
+
   );
 
   let currentCode = null;
@@ -61,36 +70,52 @@ const sb = supabase.createClient(
   }
 
   async function loadLatest() {
-    const { data, error } = await sb
-      .from("scan_events")
-      .select("code, created_at")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+  const { data, error } = await sb
+    .from("scan_events")
+    .select("code, created_at")
+    .order("created_at", { ascending: false })
+    .limit(1);
 
-    if (error || !data?.code) return;
-
-    if (data.code === currentCode) return;
-
-    currentCode = data.code;
-
-    const embedUrl = toSpotifyEmbed(data.code);
-
-    document.getElementById("container").innerHTML = `
-      <iframe
-        src="${embedUrl}"
-        allow="autoplay; fullscreen; encrypted-media"
-        allowfullscreen
-      ></iframe>
-    `;
-
-    console.log("▶️ Nu spelend:", embedUrl);
+  if (error) {
+    console.error("Supabase error:", error);
+    return;
   }
+
+  if (!data || data.length === 0) {
+    console.log("Nog geen scans");
+    return;
+  }
+
+  const latest = data[0];
+
+  if (latest.code === currentCode) return;
+
+  currentCode = latest.code;
+
+  const embedUrl = toSpotifyEmbed(latest.code);
+
+  document.getElementById("container").innerHTML = `
+    <iframe
+      src="${embedUrl}"
+      allow="autoplay; encrypted-media; fullscreen"
+      allowfullscreen
+    ></iframe>
+  `;
+
+  console.log("▶️ Nu spelend:", embedUrl);
+}
 
   loadLatest();
   setInterval(loadLatest, 3000);
 </script>
 
+
+<iframe
+  src="https://open.spotify.com/embed/track/OVjIjW4GUXAMYd2vXMi3b?utm_source=generator"
+  width="100%"
+  height="100%"
+  allow="autoplay; clipboard-write; encrypted-media; fullscreen"
+></iframe>
+
 </body>
 </html>
-
