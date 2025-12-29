@@ -76,36 +76,40 @@ async function registerCode(rawText) {
 
   try {
     const res = await fetch(EDGE_URL, {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json",
-        "apikey": SUPABASE_ANON_KEY,
-        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-    },
-    body: JSON.stringify({
-        code: code,
-        spotify_url: code,
-        url: code
-    })
-    });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+  },
+  body: JSON.stringify({
+    code: code,
+    spotify_url: code,
+    url: code
+  })
+});
 
+let data = null;
+const text = await res.text();
 
-    const data = await res.json();
-    console.log("⬅️ Response van Edge:", data);
+try {
+  data = JSON.parse(text);
+} catch {
+  data = { error: text };
+}
 
-    if (!res.ok) {
-    setStatus(
-        `❌ Fout: ${data?.error || "onbekend"}`,
-        "bad"
-    );
-    return;
-    }
+console.log("⬅️ Edge response:", data);
 
+if (!res.ok) {
+  setStatus(`❌ ${data.error || "Opslaan mislukt"}`, "bad");
+  return;
+}
 
-    setStatus(
-      `✅ ${data.spotify_track?.title ?? "Code verwerkt"}`,
-      "ok"
-    );
+setStatus(
+  `✅ ${data.spotify_track?.title ?? "Code verwerkt"}`,
+  "ok"
+);
+
 
   } catch (err) {
     console.error("❌ Netwerk/JS fout:", err);
