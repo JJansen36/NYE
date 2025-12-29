@@ -167,42 +167,48 @@ async function useToken() {
 }
 
 async function startQR() {
+  if (!window.Html5Qrcode) {
+    setStatus(el.status, 'QR scanner niet beschikbaar', 'bad');
+    return;
+  }
+
+  if (html5QrCode) {
+    await html5QrCode.stop().catch(() => {});
+  }
+
+  html5QrCode = new Html5Qrcode("qrReader");
+
+  const config = {
+    fps: 10,
+    qrbox: { width: 250, height: 250 },
+    aspectRatio: 1.0
+  };
+
   try {
-    if (!window.Html5Qrcode) {
-      setStatus(el.status, 'QR scanner library niet geladen.', 'bad');
-      return;
-    }
-
-    el.qrBox.classList.remove('hidden');
-    el.qrStatus.textContent = 'Camera starten…';
-
-    if (!qr) qr = new window.Html5Qrcode('qrReader');
-
-    const cameras = await window.Html5Qrcode.getCameras();
-    if (!cameras?.length) {
-      el.qrStatus.textContent = 'Geen camera gevonden.';
-      return;
-    }
-
-    const camId = cameras[0].id;
-
-    await qr.start(
-      { deviceId: { exact: camId } },
-      { fps: 10, qrbox: { width: 240, height: 240 } },
-      async (decodedText) => {
-        el.qrStatus.textContent = 'QR gevonden ✅';
-        el.tokenInput.value = asToken(decodedText);
-        await useToken();
-      },
-      () => {}
+    await html5QrCode.start(
+      { facingMode: { exact: "environment" } }, // ⬅️ ACHTERCAMERA
+      config,
+      onScanSuccess,
+      onScanFailure
     );
 
-    el.qrStatus.textContent = 'Richt de camera op de QR.';
-  } catch (e) {
-    console.error(e);
-    el.qrStatus.textContent = e.message || String(e);
+    el.qrBox.classList.remove('hidden');
+    el.btnStartQR.disabled = true;
+    el.btnStopQR.disabled = false;
+
+  } catch (err) {
+    console.warn('Achtercamera niet beschikbaar, fallback', err);
+
+    // Fallback: laat browser kiezen
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      onScanSuccess,
+      onScanFailure
+    );
   }
 }
+
 
 async function stopQR() {
   try {
