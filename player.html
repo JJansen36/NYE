@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -15,17 +14,40 @@
       background: #000;
       color: #fff;
       height: 100%;
+      font-family: system-ui, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: system-ui, sans-serif;
-      font-size: 28px;
+    }
+
+    #screen {
+      text-align: center;
+      cursor: pointer;
+      font-size: 32px;
+      user-select: none;
+    }
+
+    .hint {
+      margin-top: 12px;
+      font-size: 18px;
+      opacity: 0.7;
+    }
+
+    .armed {
+      color: #4ade80;
+    }
+
+    .blocked {
+      color: #f87171;
     }
   </style>
 </head>
 <body>
 
-<div id="status">Wachten op scan…</div>
+<div id="screen">
+  🔒 Scan uitgeschakeld
+  <div class="hint">Klik om scan te activeren</div>
+</div>
 
 <script>
 const sb = supabase.createClient(
@@ -33,31 +55,93 @@ const sb = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
 );
 
-  let lastCode = null;
+const ACTIVE_WINDOW = 5000; // 5 seconden om te scannen
 
-  async function checkLatest() {
-    const { data, error } = await sb
-      .from("scan_events")
-      .select("code, created_at")
-      .order("created_at", { ascending: false })
-      .limit(1);
+let lastCode = null;
+let activeUntil = 0;
+let enabled = false;
 
-    if (error || !data || data.length === 0) return;
+const screen = document.getElementById("screen");
 
-    const latest = data[0];
+// 🔓 Klik = scan activeren (1x)
+screen.addEventListener("click", () => {
 
-    if (latest.code === lastCode) return;
-
-    lastCode = latest.code;
-
-    document.getElementById("status").innerText = "Spotify openen… 🎵";
-
-    // 🔥 Spotify openen
-    window.open(latest.code, "_blank");
+  // Eerste klik: Spotify popup permissie
+  if (!enabled) {
+    enabled = true;
   }
 
-  // elke 2 sec checken
-  setInterval(checkLatest, 2000);
+  // Scan activeren
+  sessionStorage.setItem("scan_armed", "1");
+  activeUntil = Date.now() + ACTIVE_WINDOW;
+
+  screen.innerHTML = `
+    🟢 Scan nu een kaart
+    <div class="hint">Nog ${ACTIVE_WINDOW / 1000} seconden</div>
+  `;
+  screen.className = "armed";
+});
+
+// 🔁 Check op nieuwe scan
+async function checkLatest() {
+  if (!enabled) return;
+  if (sessionStorage.getItem("scan_armed") !== "1") return;
+
+  const { data } = await sb
+    .from("scan_events")
+    .select("code, created_at")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (!data || data.length === 0) return;
+
+  const latest = data[0];
+
+  // 👉 nieuwe scan
+  if (latest.code !== lastCode) {
+    lastCode = latest.code;
+
+    // ❗ scan verbruikt → meteen weer blokkeren
+    sessionStorage.removeItem("scan_armed");
+    activeUntil = 0;
+
+    screen.innerHTML = `
+      ▶️ Klik om Spotify te openen
+      <div class="hint">Scan ontvangen</div>
+    `;
+    screen.className = "";
+  }
+}
+
+// 🔁 Countdown / timeout
+function updateCountdown() {
+  if (sessionStorage.getItem("scan_armed") !== "1") return;
+
+  const remaining = activeUntil - Date.now();
+  if (remaining <= 0) {
+    sessionStorage.removeItem("scan_armed");
+    screen.innerHTML = `
+      🔒 Scan verlopen
+      <div class="hint">Klik om opnieuw te activeren</div>
+    `;
+    screen.className = "blocked";
+    return;
+  }
+
+  const sec = Math.ceil(remaining / 1000);
+  const hint = screen.querySelector(".hint");
+  if (hint) hint.innerText = `Nog ${sec} seconden`;
+}
+
+// ▶️ Spotify openen (alleen na geldige scan)
+screen.addEventListener("dblclick", () => {
+  if (!lastCode) return;
+  window.open(lastCode, "_blank");
+});
+
+// polling
+setInterval(checkLatest, 2000);
+setInterval(updateCountdown, 500);
 </script>
 
 </body>
