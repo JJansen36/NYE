@@ -37,13 +37,13 @@
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- QR scanner (lokaal!) -->
+  <!-- QR scanner -->
   <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
 </head>
 <body>
 
 <div class="box">
-  <h2>QR scannen</h2>
+  <h2 id="title">QR scannen</h2>
 
   <div id="status" class="muted">Klaar om te scannen</div>
 
@@ -62,10 +62,19 @@
 
   const statusEl = document.getElementById('status');
   const btnScan = document.getElementById('btnScan');
+  const titleEl = document.getElementById('title');
+
+  // 👉 TEAM ID UIT URL
+  const params = new URLSearchParams(window.location.search);
+  const teamId = params.get('team');
+
+  if (teamId) {
+    titleEl.textContent = `QR scannen – Team ${teamId}`;
+  }
 
   let qr = null;
 
-  function setStatus(msg, cls = '') {
+  function setStatus(msg, cls = 'muted') {
     statusEl.className = cls;
     statusEl.textContent = msg;
   }
@@ -75,7 +84,10 @@
 
     const { error } = await sb
       .from('scan_events')
-      .insert({ code });
+      .insert({
+        code,
+        team_id: teamId ? Number(teamId) : null
+      });
 
     if (error) {
       console.error(error);
@@ -100,7 +112,6 @@
           await qr.stop();
           qr.clear();
 
-          // neem eerste “woord” als code
           const code = text.trim();
           registerCode(code);
         }
@@ -115,7 +126,6 @@
   };
 
   // 🔁 fallback: code via URL
-  const params = new URLSearchParams(window.location.search);
   const codeFromUrl = params.get('code');
   if (codeFromUrl) {
     registerCode(codeFromUrl);
