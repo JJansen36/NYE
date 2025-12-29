@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -12,110 +13,52 @@
       margin: 0;
       padding: 0;
       background: #000;
-      width: 100%;
+      color: #fff;
       height: 100%;
-    }
-
-    iframe {
-      width: 100vw;
-      height: 100vh;
-      border: none;
-    }
-
-    iframe {
-  width: 100vw;
-  height: 100vh;
-  border: 5px solid red; /* test */
-  background: white;
-}
-
-
-    .empty {
-      color: #aaa;
-      font-family: system-ui, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 100vh;
-      font-size: 24px;
+      font-family: system-ui, sans-serif;
+      font-size: 28px;
     }
   </style>
 </head>
 <body>
 
-<div id="container" class="empty">
-  Wachten op scan…
-</div>
+<div id="status">Wachten op scan…</div>
 
 <script>
 const sb = supabase.createClient(
   "https://wjvleduvvjjseunakmcb.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
+);
 
-  );
+  let lastCode = null;
 
-  let currentCode = null;
+  async function checkLatest() {
+    const { data, error } = await sb
+      .from("scan_events")
+      .select("code, created_at")
+      .order("created_at", { ascending: false })
+      .limit(1);
 
-  function toSpotifyEmbed(url) {
-    if (!url) return null;
+    if (error || !data || data.length === 0) return;
 
-    if (url.includes("open.spotify.com/track/")) {
-      return url.replace(
-        "open.spotify.com/track/",
-        "open.spotify.com/embed/track/"
-      );
-    }
+    const latest = data[0];
 
-    return url;
+    if (latest.code === lastCode) return;
+
+    lastCode = latest.code;
+
+    document.getElementById("status").innerText = "Spotify openen… 🎵";
+
+    // 🔥 Spotify openen
+    window.open(latest.code, "_blank");
   }
 
-  async function loadLatest() {
-  const { data, error } = await sb
-    .from("scan_events")
-    .select("code, created_at")
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (error) {
-    console.error("Supabase error:", error);
-    return;
-  }
-
-  if (!data || data.length === 0) {
-    console.log("Nog geen scans");
-    return;
-  }
-
-  const latest = data[0];
-
-  if (latest.code === currentCode) return;
-
-  currentCode = latest.code;
-
-  const embedUrl = toSpotifyEmbed(latest.code);
-
-  document.getElementById("container").innerHTML = `
-    <iframe
-      src="${embedUrl}"
-      allow="autoplay; encrypted-media; fullscreen"
-      allowfullscreen
-    ></iframe>
-  `;
-
-  console.log("▶️ Nu spelend:", embedUrl);
-}
-
-  loadLatest();
-  setInterval(loadLatest, 3000);
+  // elke 2 sec checken
+  setInterval(checkLatest, 2000);
 </script>
-
-
-<iframe
-  src="https://open.spotify.com/embed/track/OVjIjW4GUXAMYd2vXMi3b?utm_source=generator"
-  width="100%"
-  height="100%"
-  allow="autoplay; clipboard-write; encrypted-media; fullscreen"
-></iframe>
 
 </body>
 </html>
