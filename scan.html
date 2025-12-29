@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QR Scan</title>
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f14;
+      color: #fff;
+      margin: 0;
+      padding: 24px;
+      text-align: center;
+    }
+    .box {
+      max-width: 360px;
+      margin: 0 auto;
+    }
+    button {
+      padding: 12px 18px;
+      font-size: 16px;
+      margin-top: 12px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    }
+    #qrReader {
+      margin-top: 16px;
+    }
+    .ok { color: #4ade80; }
+    .bad { color: #f87171; }
+    .muted { color: #9ca3af; }
+  </style>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- QR scanner (lokaal!) -->
+  <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
+</head>
+<body>
+
+<div class="box">
+  <h2>QR scannen</h2>
+
+  <div id="status" class="muted">Klaar om te scannen</div>
+
+  <button id="btnScan" type="button">📷 Scan QR-code</button>
+
+  <div id="qrReader"></div>
+</div>
+
+<script type="module">
+  import { SUPABASE_URL, SUPABASE_ANON_KEY } from './js/config.js';
+
+  const sb = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
+
+  const statusEl = document.getElementById('status');
+  const btnScan = document.getElementById('btnScan');
+
+  let qr = null;
+
+  function setStatus(msg, cls = '') {
+    statusEl.className = cls;
+    statusEl.textContent = msg;
+  }
+
+  async function registerCode(code) {
+    setStatus(`Code ${code} opslaan…`);
+
+    const { error } = await sb
+      .from('scan_events')
+      .insert({ code });
+
+    if (error) {
+      console.error(error);
+      setStatus('❌ Opslaan mislukt', 'bad');
+    } else {
+      setStatus(`✅ Code ${code} geregistreerd`, 'ok');
+    }
+  }
+
+  btnScan.onclick = async () => {
+    try {
+      setStatus('Camera starten…');
+
+      qr = new Html5Qrcode('qrReader');
+
+      await qr.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 250 },
+        async (text) => {
+          console.log('Gescand:', text);
+
+          await qr.stop();
+          qr.clear();
+
+          // neem eerste “woord” als code
+          const code = text.trim();
+          registerCode(code);
+        }
+      );
+
+      setStatus('Scan een QR-code');
+
+    } catch (err) {
+      console.error(err);
+      setStatus('❌ Camera niet beschikbaar', 'bad');
+    }
+  };
+
+  // 🔁 fallback: code via URL
+  const params = new URLSearchParams(window.location.search);
+  const codeFromUrl = params.get('code');
+  if (codeFromUrl) {
+    registerCode(codeFromUrl);
+  }
+</script>
+
+</body>
+</html>
