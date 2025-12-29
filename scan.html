@@ -90,9 +90,9 @@
       });
 
     if (error) {
-      console.error(error);
-      setStatus('❌ Opslaan mislukt', 'bad');
-    } else {
+  console.error("Supabase error:", error);
+  setStatus(`❌ ${error.message}`, 'bad');
+} else {
       setStatus(`✅ Code ${code} geregistreerd`, 'ok');
     }
   }
@@ -134,3 +134,4 @@
 
 </body>
 </html>
+
