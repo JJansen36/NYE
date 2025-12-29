@@ -12,8 +12,8 @@
       margin: 0;
       padding: 0;
       background: #000;
-      height: 100%;
       width: 100%;
+      height: 100%;
     }
 
     iframe {
@@ -24,11 +24,12 @@
 
     .empty {
       color: #aaa;
-      font-family: sans-serif;
+      font-family: system-ui, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
       height: 100vh;
+      font-size: 24px;
     }
   </style>
 </head>
@@ -41,40 +42,53 @@
 <script>
 const sb = supabase.createClient(
   "https://qejxwoxaurbwllihnvim.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
 );
 
-  async function loadLatestLink() {
+  let currentCode = null;
+
+  async function loadLatest() {
     const { data, error } = await sb
-      .from("scans")
-      .select("link")
+      .from("scan_events")
+      .select("code, created_at")
       .order("created_at", { ascending: false })
       .limit(1)
       .single();
 
-    if (error || !data?.link) {
-      console.warn("Geen link gevonden");
+    if (error) {
+      console.error("Supabase error:", error);
       return;
     }
+
+    if (!data?.code) {
+      console.warn("Geen code gevonden");
+      return;
+    }
+
+    // voorkom opnieuw laden van dezelfde link
+    if (data.code === currentCode) return;
+
+    currentCode = data.code;
 
     const container = document.getElementById("container");
 
     container.innerHTML = `
       <iframe
-        src="${data.link}"
+        src="${data.code}"
         allow="autoplay; fullscreen; encrypted-media"
         allowfullscreen
       ></iframe>
     `;
+
+    console.log("▶️ Nieuwe link afgespeeld:", data.code);
   }
 
   // eerste load
-  loadLatestLink();
+  loadLatest();
 
-  // elke 5 seconden checken of er iets nieuws is
-  setInterval(loadLatestLink, 5000);
+  // elke 3 sec checken
+  setInterval(loadLatest, 3000);
 </script>
 
 </body>
 </html>
-
