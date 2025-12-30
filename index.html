@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Spotify Quiz — Hoofdscherm</title>
   <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="supabase.js"></script>
 </head>
+
 <body>
   <div class="container">
     <div class="topbar">
@@ -15,7 +14,9 @@
         <div class="logo">🎵</div>
         <div>
           <div class="h1">Spotify Quiz — Hoofdscherm</div>
-          <div class="sub">Realtime via Supabase • open <span class="kbd">admin.html</span> om te sturen</div>
+          <div class="sub">
+            Realtime via Supabase • open <span class="kbd">admin.html</span> om te sturen
+          </div>
         </div>
       </div>
       <div class="sub" id="status">Verbinden…</div>
@@ -28,7 +29,6 @@
           <div class="sub">Score</div>
           <div class="score" id="team1Score">0</div>
         </div>
-        <div class="small">Tip: fullscreen op TV</div>
       </div>
 
       <div class="card centerCard">
@@ -36,8 +36,8 @@
         <div class="question" id="questionText">Wacht op admin…</div>
 
         <div class="mediaWrap" id="mediaWrap" style="display:none;">
-          <img id="artistPhoto" class="artistPhoto" alt="Artiest foto" />
-          <audio id="audio" preload="auto"></audio>
+          <img id="artistPhoto" class="artistPhoto" />
+          <audio id="audio"></audio>
         </div>
 
         <div class="answer" id="answerBox"></div>
@@ -50,26 +50,17 @@
           <div class="sub">Score</div>
           <div class="score" id="team2Score">0</div>
         </div>
-        <div class="small" style="text-align:right">Audio kan 1x “enable” nodig hebben</div>
       </div>
     </div>
   </div>
 
-  <!-- Audio enable overlay (autoplay restrictions) -->
-  <div class="overlay" id="audioOverlay">
-    <div class="overlayCard">
-      <div style="font-size:18px;font-weight:900;">Audio inschakelen</div>
-      <div class="sub" style="margin-top:6px;">
-        Browsers blokkeren autoplay. Klik 1x om intro’s automatisch te laten spelen.
-      </div>
-      <div class="controls" style="justify-content:center;margin-top:12px;">
-        <button class="primary" id="enableAudioBtn">✅ Enable audio</button>
-      </div>
-      <hr class="sep"/>
-      <div class="small">Daarna kun je dit scherm fullscreen zetten.</div>
-    </div>
-  </div>
+  <!-- SUPABASE SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <script type="module" src="main.js"></script>
+  <!-- SUPABASE CLIENT -->
+  <script src="supabase.js"></script>
+
+  <!-- MAIN LOGIC -->
+  <script src="main.js"></script>
 </body>
 </html>
