@@ -77,6 +77,10 @@
   </div>
 
   <div class="status" id="status"></div>
+
+  <button onclick="revealAnswer()">Toon antwoord</button>
+  <button onclick="hideAnswer()">Verberg</button>
+
 </div>
 
 <script type="module">
@@ -88,6 +92,43 @@ const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ===========================
+   REVEAL (HOOFDSCHERM)
+=========================== */
+async function revealAnswer() {
+  const { data, error } = await sb
+    .from("scan_events")
+    .select("title, artist, year")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    console.error("Geen scan om te tonen", error);
+    return;
+  }
+
+  await sb
+    .from("game_reveal")
+    .update({
+      title: data.title,
+      artist: data.artist,
+      year: data.year,
+      visible: true,
+      updated_at: new Date()
+    })
+    .eq("id", 1);
+}
+
+async function hideAnswer() {
+  await sb
+    .from("game_reveal")
+    .update({ visible: false })
+    .eq("id", 1);
+}
+
+
 
 /* ===========================
    CONSTANTS
