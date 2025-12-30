@@ -72,46 +72,39 @@
   const MAX_AGE_MINUTES = 2;
   const CHECK_INTERVAL = 3000;
 
-  let spotifyArmed = false;     // opent 1x per scan-open
-  let lastOpenedTrackId = null; // voorkomt dubbele opens
-  let pollTimer = null;
   let scanOpen = false;
+  let spotifyArmed = false;
+  let pollTimer = null;
+  let lastPlayedScanEventId = null;
 
   const btn = document.getElementById("toggleBtn");
   const statusEl = document.getElementById("status");
 
+  /* ------------------ helpers ------------------ */
   function isYoungerThanMinutes(date, min) {
     return Date.now() - new Date(date).getTime() <= min * 60000;
-  }
-
-  function parseTrackIdFromUrl(url) {
-    if (!url) return null;
-    // spotify:track:xxxx
-    if (url.includes("spotify:track:")) return url.split(":")[2] || null;
-    // https://open.spotify.com/track/xxxx?...
-    if (url.includes("open.spotify.com/track/")) {
-      return url.split("/track/")[1]?.split("?")[0] || null;
-    }
-    return null;
-  }
-
-  async function loadGameState() {
-    const { data, error } = await sb
-      .from("game_state")
-      .select("scan_open")
-      .eq("id", 1)
-      .single();
-
-    if (error || !data) return false;
-    return data.scan_open === true;
   }
 
   function updateUI() {
     btn.textContent = scanOpen ? "⛔ Scan sluiten" : "📷 Scan openen";
     btn.className = scanOpen ? "closed" : "open";
     statusEl.textContent = scanOpen
-      ? "Scan is open – wacht op scan_event"
+      ? "Scan is open – wacht op QR"
       : "Scan is gesloten";
+  }
+
+  /* ------------------ state ------------------ */
+  async function loadGameState() {
+    const { data, error } = await sb
+      .from("game_state")
+      .select("scan_open, last_played_scan_event_id")
+      .eq("id", 1)
+      .single();
+
+    if (error || !data) return;
+
+    scanOpen = data.scan_open === true;
+    lastPlayedScanEventId = data.last_played_scan_event_id;
   }
 
   async function toggleGameState() {
@@ -123,15 +116,14 @@
       .eq("id", 1);
 
     scanOpen = newState;
-    spotifyArmed = newState;      // open 1x per open
-    lastOpenedTrackId = null;
+    spotifyArmed = newState;   // 🔑 reset alleen bij openen
 
     updateUI();
     handlePolling();
   }
 
+  /* ------------------ scan logic ------------------ */
   async function getLatestScanEvent() {
-    // We pakken gewoon de laatste scan_event rij (alle kolommen) zodat we niet stuklopen op kolomnamen
     const { data, error } = await sb
       .from("scan_events")
       .select("*")
@@ -139,29 +131,15 @@
       .limit(1)
       .maybeSingle();
 
-    if (error) return null;
-    return data || null;
+    if (error || !data) return null;
+    return data;
   }
 
   async function getTrackIdForScanEvent(scanEvent) {
-    // 1) Probeer direct uit scan_events (als jij daar iets opslaat)
-    //    We checken een paar veelvoorkomende velden zonder hard te falen:
-    const direct =
-      scanEvent.spotify_track_id ||
-      scanEvent.track_id ||
-      scanEvent.spotify_id ||
-      parseTrackIdFromUrl(scanEvent.spotify_url) ||
-      parseTrackIdFromUrl(scanEvent.url) ||
-      parseTrackIdFromUrl(scanEvent.link);
-
-    if (direct) return direct;
-
-    // 2) Anders: lookup in spotify_tracks via scan_event_id
     const { data, error } = await sb
       .from("spotify_tracks")
-      .select("spotify_track_id, created_at")
+      .select("spotify_track_id")
       .eq("scan_event_id", scanEvent.id)
-      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -173,36 +151,41 @@
     if (!scanOpen || !spotifyArmed) return;
 
     const ev = await getLatestScanEvent();
-    if (!ev) return;
+    if (!ev || !ev.created_at) return;
 
-    // created_at moet bestaan; als jouw scan_events een andere timestamp heeft: pas hier aan
-    if (!ev.created_at) return;
+    // ❌ al gebruikt → negeren
+    if (ev.id === lastPlayedScanEventId) return;
 
+    // ⏱ ouder dan 2 min → negeren
     if (!isYoungerThanMinutes(ev.created_at, MAX_AGE_MINUTES)) return;
 
     const trackId = await getTrackIdForScanEvent(ev);
     if (!trackId) return;
 
-    if (trackId === lastOpenedTrackId) return;
+    // 🎵 Spotify openen
+    window.open(
+      `https://open.spotify.com/track/${trackId}`,
+      "_blank"
+    );
 
-    lastOpenedTrackId = trackId;
-    spotifyArmed = false; // 1x openen per scan-open
-
-    window.open(`https://open.spotify.com/track/${trackId}`, "_blank");
-    statusEl.textContent = "🎵 Spotify nummer gestart (via scan_events)";
-
-    
-    // 🔒 AUTOMATISCH SCAN SLUITEN
+    // ✅ markeer scan als gebruikt + sluit scan
     await sb
       .from("game_state")
-      .update({ scan_open: false })
+      .update({
+        scan_open: false,
+        last_played_scan_event_id: ev.id
+      })
       .eq("id", 1);
 
     scanOpen = false;
-    handlePolling();
+    spotifyArmed = false;
+    lastPlayedScanEventId = ev.id;
+
     updateUI();
+    handlePolling();
+
+    statusEl.textContent = "🎵 Spotify gestart – scan gesloten";
   }
-  
 
   function handlePolling() {
     if (pollTimer) {
@@ -210,17 +193,21 @@
       pollTimer = null;
     }
     if (scanOpen) {
-      pollTimer = setInterval(checkLatestFromScanEvents, CHECK_INTERVAL);
+      pollTimer = setInterval(
+        checkLatestFromScanEvents,
+        CHECK_INTERVAL
+      );
     }
   }
 
-  // INIT
-  scanOpen = await loadGameState();
+  /* ------------------ init ------------------ */
+  await loadGameState();
   updateUI();
   handlePolling();
 
   btn.addEventListener("click", toggleGameState);
 </script>
+
 
 
 </body>
