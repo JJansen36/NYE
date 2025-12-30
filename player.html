@@ -80,7 +80,7 @@
   const btn = document.getElementById("toggleBtn");
   const statusEl = document.getElementById("status");
 
-  /* ------------------ helpers ------------------ */
+  /* ---------------- helpers ---------------- */
   function isYoungerThanMinutes(date, min) {
     return Date.now() - new Date(date).getTime() <= min * 60000;
   }
@@ -93,15 +93,15 @@
       : "Scan is gesloten";
   }
 
-  /* ------------------ state ------------------ */
+  /* ---------------- state ---------------- */
   async function loadGameState() {
-    const { data, error } = await sb
+    const { data } = await sb
       .from("game_state")
       .select("scan_open, last_played_scan_event_id")
       .eq("id", 1)
       .single();
 
-    if (error || !data) return;
+    if (!data) return;
 
     scanOpen = data.scan_open === true;
     lastPlayedScanEventId = data.last_played_scan_event_id;
@@ -116,35 +116,33 @@
       .eq("id", 1);
 
     scanOpen = newState;
-    spotifyArmed = newState;   // 🔑 reset alleen bij openen
+    spotifyArmed = newState; // 👈 alleen “arm” bij openen
 
     updateUI();
     handlePolling();
   }
 
-  /* ------------------ scan logic ------------------ */
+  /* ---------------- scan logic ---------------- */
   async function getLatestScanEvent() {
-    const { data, error } = await sb
+    const { data } = await sb
       .from("scan_events")
-      .select("*")
-      .order("created_at", { ascending: false })
+      .select("id, created_at")
+      .order("id", { ascending: false }) // 👈 belangrijk
       .limit(1)
       .maybeSingle();
 
-    if (error || !data) return null;
-    return data;
+    return data || null;
   }
 
   async function getTrackIdForScanEvent(scanEvent) {
-    const { data, error } = await sb
+    const { data } = await sb
       .from("spotify_tracks")
       .select("spotify_track_id")
       .eq("scan_event_id", scanEvent.id)
       .limit(1)
       .maybeSingle();
 
-    if (error || !data) return null;
-    return data.spotify_track_id || null;
+    return data?.spotify_track_id || null;
   }
 
   async function checkLatestFromScanEvents() {
@@ -153,10 +151,15 @@
     const ev = await getLatestScanEvent();
     if (!ev || !ev.created_at) return;
 
-    // ❌ al gebruikt → negeren
-    if (ev.id === lastPlayedScanEventId) return;
+    // ❌ ouder of gelijk aan laatst gespeelde → negeren
+    if (
+      lastPlayedScanEventId !== null &&
+      ev.id <= lastPlayedScanEventId
+    ) {
+      return;
+    }
 
-    // ⏱ ouder dan 2 min → negeren
+    // ⏱ ouder dan 2 minuten → negeren
     if (!isYoungerThanMinutes(ev.created_at, MAX_AGE_MINUTES)) return;
 
     const trackId = await getTrackIdForScanEvent(ev);
@@ -200,13 +203,14 @@
     }
   }
 
-  /* ------------------ init ------------------ */
+  /* ---------------- init ---------------- */
   await loadGameState();
   updateUI();
   handlePolling();
 
   btn.addEventListener("click", toggleGameState);
 </script>
+
 
 
 
