@@ -116,11 +116,10 @@ async function activateQuestion() {
   await sb
     .from("quiz_state")
     .update({
-      pending_category: $("category").value,
-      active_scan_event_id: null,
-      show_answer: false
+      show_answer: !state.show_answer
     })
     .eq("id", 1);
+
 
   alert("Categorie klaar! Laat nu scannen.");
 }
@@ -137,11 +136,16 @@ function bindUI() {
   };
 
   $("clearQuestion").onclick = async () => {
-    await sb.from("quiz_state").update({
-      active_scan_event_id: null,
-      active_category: null,
-      show_answer: false
-    }).eq("id", 1);
+    await sb
+      .from("quiz_state")
+      .update({
+        active_category: null,
+        active_scan_event_id: null,
+        pending_category: null,
+        show_answer: false
+      })
+      .eq("id", 1);
+
   };
 
   document.querySelectorAll("[data-team]").forEach(btn => {
