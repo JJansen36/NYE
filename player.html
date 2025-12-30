@@ -67,18 +67,17 @@
     <button id="toggleBtn">⏳ laden…</button>
 
     <div class="box" id="infoBox">
-      Klik op “Scan openen” om een nieuw nummer te starten.
+      Klik op “Scan openen” om een nieuwe ronde te starten.
     </div>
 
     <div class="status" id="status"></div>
   </div>
 
   <script type="module">
-const SUPABASE_URL = "https://wjvleduvvjjseunakmcb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
+    const SUPABASE_URL = "https://wjvleduvvjjseunakmcb.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const CHECK_INTERVAL = 1200;
     const MAX_AGE_MINUTES = 2;
@@ -86,7 +85,6 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let scanOpen = false;
     let pollTimer = null;
     let lastPlayedScanEventId = 0;
-    let spotifyTab = null;
 
     const btn = document.getElementById("toggleBtn");
     const statusEl = document.getElementById("status");
@@ -101,73 +99,27 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       btn.className = scanOpen ? "closed" : "open";
 
       infoBox.textContent = scanOpen
-        ? "Nieuw tabblad staat open. Scan nu een QR-code."
+        ? "Wachten op QR-scan…"
         : "Klik op “Scan openen” om een nieuwe ronde te starten.";
 
       statusEl.textContent = scanOpen
-        ? "Wachten op QR-scan…"
+        ? "Scan is open"
         : "Scan is gesloten";
     }
 
     async function loadState() {
       const { data } = await sb
         .from("game_state")
-        .select("scan_open, last_played_scan_event_id")
+        .select("last_played_scan_event_id")
         .eq("id", 1)
         .single();
 
-      if (!data) return;
-
-      scanOpen = false; // altijd geforceerd sluiten bij laden
-      lastPlayedScanEventId = data.last_played_scan_event_id ?? 0;
-
-      await sb.from("game_state")
-        .update({ scan_open: false })
-        .eq("id", 1);
-    }
-
-    function openWaitingTab() {
-      spotifyTab = window.open("", "_blank");
-      if (!spotifyTab) {
-        statusEl.textContent = "⚠️ Popup geblokkeerd. Sta popups toe.";
-        return false;
+      if (data) {
+        lastPlayedScanEventId = data.last_played_scan_event_id ?? 0;
       }
 
-      try {
-        spotifyTab.document.write(`
-          <!doctype html>
-          <html>
-          <head>
-            <meta charset="utf-8" />
-            <title>Wachten op scan…</title>
-            <style>
-              body {
-                margin:0;
-                font-family:system-ui;
-                background:#0f0f14;
-                color:#fff;
-                display:flex;
-                align-items:center;
-                justify-content:center;
-                height:100vh;
-                text-align:center;
-                padding:24px;
-              }
-              .small { opacity:.8; margin-top:10px; font-size:14px }
-            </style>
-          </head>
-          <body>
-            <div>
-              <div style="font-size:22px">📷 Wachten op QR-scan…</div>
-              <div class="small">Laat dit tabblad open.</div>
-            </div>
-          </body>
-          </html>
-        `);
-        spotifyTab.document.close();
-      } catch {}
-
-      return true;
+      // altijd gesloten starten
+      await sb.from("game_state").update({ scan_open: false }).eq("id", 1);
     }
 
     async function getNextScanEvent() {
@@ -195,25 +147,14 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     async function pollForScan() {
       if (!scanOpen) return;
 
-      if (spotifyTab && spotifyTab.closed) {
-        spotifyTab = null;
-        await closeScan();
-        return;
-      }
-
       const ev = await getNextScanEvent();
       if (!ev || !isRecent(ev.created_at)) return;
 
       const trackUrl = await getSpotifyUrl(ev.id);
       if (!trackUrl) return;
 
-      // 🔑 EXACTE SPOTIFY TRACK URL
-      if (spotifyTab && !spotifyTab.closed) {
-        spotifyTab.location.href = trackUrl;
-        spotifyTab.focus?.();
-      } else {
-        window.open(trackUrl, "_blank");
-      }
+      // 🎵 START SPOTIFY IN NIEUW TABBLAD
+      window.open(trackUrl, "_blank");
 
       await sb.from("game_state").update({
         scan_open: false,
@@ -239,8 +180,6 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     }
 
     async function openScan() {
-      if (!openWaitingTab()) return;
-
       scanOpen = true;
       await sb.from("game_state").update({ scan_open: true }).eq("id", 1);
       updateUI();
