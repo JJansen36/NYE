@@ -1,70 +1,69 @@
 <!doctype html>
 <html lang="nl">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Game Player</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Game Player</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<style>
-body {
-  margin:0;
-  font-family:system-ui, sans-serif;
-  background:#0f0f14;
-  color:#fff;
-  min-height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #0f0f14;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-.player {
-  width:520px;
-  max-width:95vw;
-  background:#000;
-  border-radius:16px;
-  padding:24px;
-  box-sizing:border-box;
-}
+    .player {
+      width: 520px;
+      max-width: 95vw;
+      background: #000;
+      border-radius: 16px;
+      padding: 24px;
+      box-sizing: border-box;
+    }
 
-h1 { margin-top:0 }
+    h1 {
+      margin-top: 0;
+    }
 
-button {
-  padding:14px 22px;
-  border-radius:12px;
-  border:none;
-  font-size:16px;
-  cursor:pointer;
-}
+    button {
+      padding: 14px 22px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+    }
 
-.open { background:#22c55e; color:#000 }
-.closed { background:#ef4444; color:#fff }
+    .open { background: #22c55e; color: #000; }
+    .closed { background: #ef4444; color: #fff; }
 
-.linkbox {
-  margin-top:16px;
-  background:#111;
-  padding:14px;
-  border-radius:10px;
-  word-break:break-all;
-}
+    .linkbox {
+      margin-top: 16px;
+      background: #111;
+      padding: 14px;
+      border-radius: 10px;
+      word-break: break-all;
+      min-height: 48px;
+    }
 
-.linkbox a {
-  color:#4ade80;
-  text-decoration:none;
-}
+    .linkbox a {
+      color: #4ade80;
+      text-decoration: none;
+      font-weight: 500;
+    }
 
-.used {
-  color:#f87171;
-  font-weight:600;
-}
-
-.status {
-  margin-top:12px;
-  font-size:14px;
-  opacity:.9;
-}
-</style>
+    .status {
+      margin-top: 12px;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+  </style>
 </head>
 
 <body>
@@ -81,68 +80,86 @@ button {
 </div>
 
 <script type="module">
+/* ===========================
+   SUPABASE
+=========================== */
 const SUPABASE_URL = "https://wjvleduvvjjseunakmcb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
+
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/* ===========================
+   CONSTANTS
+=========================== */
 const GAME_TIMEOUT_MS = 3 * 60 * 1000;
 const CHECK_INTERVAL = 1200;
 
+/* ===========================
+   STATE
+=========================== */
 let scanOpen = false;
 let pollTimer = null;
 let closeTimer = null;
-let lastPlayedId = 0;
+let lastSeenScanId = 0;
 
+/* ===========================
+   UI
+=========================== */
 const btn = document.getElementById("gameBtn");
 const linkBox = document.getElementById("linkBox");
 const statusEl = document.getElementById("status");
 
-/* ---------------- helpers ---------------- */
-function setButton() {
+function updateButton() {
   btn.textContent = scanOpen
-    ? "⛔ Game gesloten"
+    ? "⛔ Game sluiten"
     : "🎮 Game openen (3 min)";
   btn.className = scanOpen ? "closed" : "open";
 }
 
-/* ---------------- game state ---------------- */
+/* ===========================
+   GAME STATE
+=========================== */
 async function openGame() {
   scanOpen = true;
-  setButton();
+  updateButton();
   statusEl.textContent = "Game open – scan een QR";
 
+  // baseline: alles tot nu toe is oud
   const { data } = await sb
     .from("scan_events")
     .select("id")
-    .order("id", { ascending:false })
+    .order("id", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  lastPlayedId = data?.id ?? 0;
+  lastSeenScanId = data?.id ?? 0;
 
   await sb.from("game_state").update({
     scan_open: true
-  }).eq("id",1);
+  }).eq("id", 1);
 
-  pollTimer = setInterval(checkScan, CHECK_INTERVAL);
-
+  pollTimer = setInterval(checkForScan, CHECK_INTERVAL);
   closeTimer = setTimeout(closeGame, GAME_TIMEOUT_MS);
 }
 
 async function closeGame() {
   scanOpen = false;
-  setButton();
+  updateButton();
   statusEl.textContent = "Game gesloten";
+
   clearInterval(pollTimer);
   clearTimeout(closeTimer);
 
   await sb.from("game_state").update({
-    scan_open:false
-  }).eq("id",1);
+    scan_open: false
+  }).eq("id", 1);
 }
 
-/* ---------------- scan logic ---------------- */
-async function checkScan() {
+/* ===========================
+   SCAN LOGIC
+=========================== */
+async function checkForScan() {
   if (!scanOpen) return;
 
   const { data: ev } = await sb
@@ -154,55 +171,38 @@ async function checkScan() {
 
   if (!ev || !ev.code) return;
 
-  // 🔹 ALTIJD TONEN
-  const isUsed = ev.id <= lastPlayedId;
+  // alleen nieuwe scans t.o.v. baseline
+  if (ev.id <= lastSeenScanId) return;
 
-  if (isUsed) {
-    linkBox.innerHTML = `
-      <span class="used">Al gebruikt</span><br>
-      ${ev.code}
-    `;
-    statusEl.textContent = "Deze QR is al gebruikt";
-    return;
-  }
+  lastSeenScanId = ev.id;
 
-  // 🔹 NIEUW → KLIKBAAR
+  // 👉 TONEN (geen 'al gebruikt'-logica meer)
   linkBox.innerHTML = `
-    <a href="#" id="playLink">▶️ ${ev.code}</a>
+    <a href="${ev.code}" target="_blank">
+      ▶️ ${ev.code}
+    </a>
   `;
-  statusEl.textContent = "Nieuwe QR ontvangen – klik om te spelen";
 
-  const playLink = document.getElementById("playLink");
+  statusEl.textContent = "Nieuwe scan ontvangen – klik om te spelen";
 
-  playLink.addEventListener("click", async (e) => {
-    e.preventDefault();
-
-    window.open(ev.code, "_blank");
-
-    lastPlayedId = ev.id;
-
-    await sb.from("game_state").update({
-      last_played_scan_event_id: ev.id,
-      scan_open: false
-    }).eq("id", 1);
-
-    closeGame();
-
-    linkBox.innerHTML = `
-      <span class="used">Al gebruikt</span><br>
-      ${ev.code}
-    `;
-    statusEl.textContent = "Nummer afgespeeld";
-  });
+  // game sluiten zodra er een scan is
+  closeGame();
 }
 
-/* ---------------- events ---------------- */
+/* ===========================
+   EVENTS
+=========================== */
 btn.addEventListener("click", () => {
-  if (!scanOpen) openGame();
+  if (!scanOpen) {
+    openGame();
+  }
 });
 
-/* ---------------- init ---------------- */
-setButton();
+/* ===========================
+   INIT
+=========================== */
+updateButton();
+statusEl.textContent = "Game gesloten";
 </script>
 </body>
 </html>
