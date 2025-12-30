@@ -67,15 +67,12 @@
 <script type="module">
   import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./js/config.js";
 
-  const sb = supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-  );
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const MAX_AGE_MINUTES = 2;
   const CHECK_INTERVAL = 4000;
 
-  let spotifyWindow = null;
+  let spotifyArmed = false;      // 👈 belangrijk
   let lastOpenedTrackId = null;
 
   const btn = document.getElementById("toggleBtn");
@@ -91,7 +88,6 @@
       .select("scan_open")
       .eq("id", 1)
       .single();
-
     return data?.scan_open === true;
   }
 
@@ -99,7 +95,7 @@
     btn.textContent = open ? "⛔ Scan sluiten" : "📷 Scan openen";
     btn.className = open ? "closed" : "open";
     statusEl.textContent = open
-      ? "Scan is open – wacht op QR"
+      ? "Scan is open – wacht op nummer"
       : "Scan is gesloten";
   }
 
@@ -113,23 +109,16 @@
 
     updateButton(!open);
 
-    // 👇 CRUCIAAL: open tab DIRECT na klik
-    if (!open) {
-      spotifyWindow = window.open(
-        "about:blank",
-        "spotifyPlayerTab"
-      );
-      lastOpenedTrackId = null;
-    } else {
-      spotifyWindow = null;
-    }
+    // 👇 hier gebeurt het verschil
+    spotifyArmed = !open;          // alleen bij openen
+    lastOpenedTrackId = null;
   }
 
   async function checkLatestTrack() {
     const open = await getGameState();
     updateButton(open);
 
-    if (!open) return;
+    if (!open || !spotifyArmed) return;
 
     const { data } = await sb
       .from("spotify_tracks")
@@ -145,19 +134,15 @@
     if (!trackId || trackId === lastOpenedTrackId) return;
 
     lastOpenedTrackId = trackId;
+    spotifyArmed = false; // 👈 maar 1x openen per scan-open
 
-    const spotifyUrl = `https://open.spotify.com/track/${trackId}`;
+    // ✅ HIER opent Spotify — geen blanco tab
+    window.open(
+      `https://open.spotify.com/track/${trackId}`,
+      "_blank"
+    );
 
-    if (spotifyWindow && !spotifyWindow.closed) {
-      spotifyWindow.location.href = spotifyUrl;
-    } else {
-      spotifyWindow = window.open(
-        spotifyUrl,
-        "spotifyPlayerTab"
-      );
-    }
-
-    statusEl.textContent = "🎵 Spotify geopend";
+    statusEl.textContent = "🎵 Spotify nummer gestart";
   }
 
   btn.addEventListener("click", toggleGameState);
@@ -166,5 +151,7 @@
   setInterval(checkLatestTrack, CHECK_INTERVAL);
 </script>
 
+
 </body>
 </html>
+
