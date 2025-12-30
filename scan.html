@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QR scannen</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js"></script>
-
   <style>
     body {
       font-family: system-ui, sans-serif;
@@ -17,9 +14,8 @@
       padding: 24px;
       text-align: center;
     }
-
     button {
-      padding: 14px 22px;
+      padding: 14px 20px;
       font-size: 18px;
       border-radius: 10px;
       border: none;
@@ -27,105 +23,69 @@
       background: #fff;
       color: #000;
     }
-
-    #status {
-      margin-top: 20px;
-      font-size: 16px;
-      opacity: 0.9;
+    .status {
+      margin-top: 16px;
+      opacity: 0.8;
     }
-
-    .ok { color: #4ade80; }
-    .bad { color: #f87171; }
+    .error {
+      color: #f87171;
+    }
+    .ok {
+      color: #4ade80;
+    }
   </style>
+
+  <!-- Supabase client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
 </head>
 
 <body>
 
   <h1>QR scannen</h1>
-  <p>⏳ Wacht tot de categorie is gekozen…</p>
+
+  <div id="info" class="status">
+    ⏳ Wacht tot de categorie is gekozen…
+  </div>
 
   <button id="scanBtn">📷 Scan QR-code</button>
 
-  <div id="status">—</div>
+  <script>
+    const info = document.getElementById("info");
+    const scanBtn = document.getElementById("scanBtn");
 
-<script>
-const EDGE_URL = "https://wjvldevvjjsueunakmcb.supabase.co/functions/v1/spotify-scan";
+    scanBtn.addEventListener("click", async () => {
+      info.textContent = "📡 Scannen gestart…";
 
+      // 🔧 Simpele testinput (later vervangbaar door echte QR-scan)
+      const scannedCode = prompt("Plak of scan de Spotify link / code:");
 
-const statusEl = document.getElementById("status");
-const scanBtn  = document.getElementById("scanBtn");
+      if (!scannedCode) {
+        info.textContent = "❌ Geen code gescand";
+        info.className = "status error";
+        return;
+      }
 
-function setStatus(text, cls = "") {
-  statusEl.textContent = text;
-  statusEl.className = cls;
-}
+      // 👉 Insert rechtstreeks in scan_events
+      const { error } = await window.sb
+        .from("scan_events")
+        .insert({
+          code: scannedCode,
+          source: "scan",
+          created_at: new Date().toISOString()
+        });
 
-scanBtn.addEventListener("click", async () => {
-  try {
-    setStatus("📡 Scannen gestart…");
+      if (error) {
+        console.error(error);
+        info.textContent = "❌ Fout bij opslaan";
+        info.className = "status error";
+        return;
+      }
 
-    // 1️⃣ QR scannen (simpele prompt — werkt ook mobiel)
-    const code = prompt("Plak of scan de QR-code");
-    if (!code) return;
-
-    // 2️⃣ Edge Function aanroepen (doet ALLE inserts)
-    const res = await fetch(EDGE_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": sb.supabaseKey,
-        "Authorization": `Bearer ${sb.supabaseKey}`
-      },
-      body: JSON.stringify({ code })
+      info.textContent = "✅ Scan ontvangen! Wacht op de quiz…";
+      info.className = "status ok";
     });
-
-    if (!res.ok) {
-      setStatus("❌ Scan mislukt", "bad");
-      return;
-    }
-
-    // 3️⃣ Laatste scan ophalen
-    const { data: scan, error: scanErr } = await sb
-      .from("scan_events")
-      .select("id")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (scanErr || !scan) {
-      setStatus("❌ Geen scan gevonden", "bad");
-      return;
-    }
-
-    // 4️⃣ Check of admin al een categorie heeft klaargezet
-    const { data: state } = await sb
-      .from("quiz_state")
-      .select("pending_category")
-      .eq("id", 1)
-      .single();
-
-    if (state?.pending_category) {
-      await sb
-        .from("quiz_state")
-        .update({
-          active_scan_event_id: scan.id,
-          active_category: state.pending_category,
-          pending_category: null,
-          show_answer: false
-        })
-        .eq("id", 1);
-
-      setStatus("✅ Scan gekoppeld — vraag verschijnt!", "ok");
-    } else {
-      setStatus("ℹ️ Scan ok — maar nog geen categorie actief");
-    }
-
-  } catch (err) {
-    console.error(err);
-    setStatus("❌ Onverwachte fout", "bad");
-  }
-});
-</script>
+  </script>
 
 </body>
 </html>
