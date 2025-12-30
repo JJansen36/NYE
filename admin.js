@@ -19,8 +19,10 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
   await loadTeams();
   bindUI();
+  listenForScans();
   $("status").textContent = "Verbonden ✅";
 }
+
 
 // -------------------------------
 // Teams laden (alleen naam + score)
@@ -105,4 +107,65 @@ function bindUI() {
       await sb.from("quiz_teams").update({ name, score }).eq("id", id);
     };
   });
+}
+async function ensureSpotifyTrackForScan(scan) {
+  if (!scan?.code) return;
+
+  // 1. Bestaat deze track al?
+  const { data: existing } = await sb
+    .from("spotify_tracks")
+    .select("id")
+    .eq("code", scan.code)
+    .maybeSingle();
+
+  if (existing) {
+    console.log("🎵 Spotify track bestaat al");
+    return;
+  }
+
+  console.log("🎧 Spotify track ophalen...");
+
+  // 2. Spotify metadata ophalen
+  // ⚠️ Dit gebruikt dezelfde setup die je EERDER al had
+  const res = await fetch(
+    `/spotify/track?url=${encodeURIComponent(scan.code)}`
+  );
+
+  if (!res.ok) {
+    console.error("Spotify fetch faalde");
+    return;
+  }
+
+  const track = await res.json();
+
+  // 3. Opslaan in spotify_tracks
+  await sb.from("spotify_tracks").insert({
+    code: scan.code,
+    title: track.title,
+    artists: track.artists?.join(", "),
+    release_year: track.year,
+    image_url: track.image
+  });
+
+  console.log("✅ Spotify track opgeslagen");
+}
+function listenForScans() {
+  console.log("👂 Luisteren naar nieuwe scans...");
+
+  sb.channel("scan-events-admin")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "scan_events"
+      },
+      async payload => {
+        const scan = payload.new;
+        console.log("📸 Nieuwe scan ontvangen:", scan);
+
+        await ensureSpotifyTrackForScan(scan);
+      }
+    )
+    .subscribe();
 }
