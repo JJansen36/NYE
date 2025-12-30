@@ -125,23 +125,18 @@ async function openGame() {
   updateButton();
   statusEl.textContent = "Game open – scan een QR";
 
-  // baseline: alles tot nu toe is oud
-  const { data } = await sb
-    .from("scan_events")
-    .select("id")
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  lastSeenScanId = data?.id ?? 0;
-
   await sb.from("game_state").update({
     scan_open: true
   }).eq("id", 1);
 
+  // 👇 DIRECT de laatste scan tonen (indien aanwezig)
+  await checkForScan();
+
+  // 👇 DAARNA pas gaan pollen voor nieuwe scans
   pollTimer = setInterval(checkForScan, CHECK_INTERVAL);
   closeTimer = setTimeout(closeGame, GAME_TIMEOUT_MS);
 }
+
 
 async function closeGame() {
   scanOpen = false;
