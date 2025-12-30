@@ -97,11 +97,14 @@ async function registerCode(rawText) {
     /* ==============================
        ✅ scan_event aanmaken
        ============================== */
-    const { data: scanEvent, error: scanErr } = await sb
-      .from("scan_events")
-      .insert({})
-      .select("id")
-      .single();
+const { data: scanEvent, error: scanErr } = await sb
+  .from("scan_events")
+  .insert({
+    code: code   // 🔥 DIT WAS VERPLICHT
+  })
+  .select("id")
+  .single();
+
 
     if (scanErr || !scanEvent?.id) {
       console.error("scan_event error", scanErr);
