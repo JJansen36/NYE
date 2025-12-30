@@ -82,6 +82,7 @@
     const CHECK_INTERVAL = 1000;
     const MAX_AGE_MINUTES = 2;
 
+    let spotifyTab = null;
     let scanOpen = false;
     let pollTimer = null;
     let lastPlayedScanEventId = 0;
@@ -133,29 +134,38 @@
       return data || null;
     }
 
-    async function pollForScan() {
-      if (!scanOpen) return;
+async function pollForScan() {
+  if (!scanOpen) return;
 
-      const ev = await getNextScanEvent();
-      if (!ev) return;
-      if (!isRecent(ev.created_at)) return;
+  const ev = await sb
+    .from("scan_events")
+    .select("id, created_at, code")
+    .gt("id", lastPlayedScanEventId)
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-      const url = ev.code;
-      if (!url || !url.startsWith("http")) return;
+  if (!ev) return;
+  if (!isRecent(ev.created_at)) return;
+  if (!ev.code) return;
 
-      // 🎵 START SPOTIFY ZOALS BIJ ECHTE QR
-      window.open(url, "_blank");
+  // 🎵 Spotify starten (toegestaan: navigatie in bestaand tabblad)
+  if (spotifyTab && !spotifyTab.closed) {
+    spotifyTab.location.href = ev.code;
+    spotifyTab.focus?.();
+  }
 
-      await sb.from("game_state").update({
-        scan_open: false,
-        last_played_scan_event_id: ev.id
-      }).eq("id", 1);
+  await sb.from("game_state").update({
+    scan_open: false,
+    last_played_scan_event_id: ev.id
+  }).eq("id", 1);
 
-      lastPlayedScanEventId = ev.id;
-      closeScan();
+  lastPlayedScanEventId = ev.id;
+  closeScan();
 
-      statusEl.textContent = "🎵 Nummer gestart";
-    }
+  statusEl.textContent = "🎵 Nummer gestart";
+}
+
 
     function startPolling() {
       stopPolling();
@@ -169,12 +179,21 @@
       }
     }
 
-    async function openScan() {
-      scanOpen = true;
-      await sb.from("game_state").update({ scan_open: true }).eq("id", 1);
-      updateUI();
-      startPolling();
-    }
+async function openScan() {
+  // 🔑 USER GESTURE → popup toegestaan
+  spotifyTab = window.open("about:blank", "_blank");
+
+  if (!spotifyTab) {
+    statusEl.textContent = "⚠️ Sta popups toe voor deze site";
+    return;
+  }
+
+  scanOpen = true;
+  await sb.from("game_state").update({ scan_open: true }).eq("id", 1);
+  updateUI();
+  startPolling();
+}
+
 
     async function closeScan() {
       scanOpen = false;
