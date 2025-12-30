@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <title>Quiz – Antwoord</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      background: #000;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .card {
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+    .card.show {
+      opacity: 1;
+    }
+    h1 { font-size: 64px; margin: 0; }
+    h2 { font-size: 48px; margin: 12px 0; opacity: 0.9; }
+    .year { font-size: 40px; opacity: 0.7; }
+  </style>
+</head>
+<body>
+
+<div id="card" class="card">
+  <h1 id="title"></h1>
+  <h2 id="artist"></h2>
+  <div class="year" id="year"></div>
+</div>
+
+<script>
+const sb = supabase.createClient(
+  "https://wjvleduvvjjseunakmcb.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
+);
+
+// realtime luisteren
+sb.channel("reveal")
+  .on(
+    "postgres_changes",
+    { event: "UPDATE", schema: "public", table: "game_reveal" },
+    payload => {
+      const data = payload.new;
+      if (data.visible) {
+        document.getElementById("title").textContent = data.title;
+        document.getElementById("artist").textContent = data.artist;
+        document.getElementById("year").textContent = data.year;
+        document.getElementById("card").classList.add("show");
+      } else {
+        document.getElementById("card").classList.remove("show");
+      }
+    }
+  )
+  .subscribe();
+</script>
+
+</body>
+</html>
