@@ -72,8 +72,10 @@
   const MAX_AGE_MINUTES = 2;
   const CHECK_INTERVAL = 4000;
 
-  let spotifyArmed = false;      // 👈 belangrijk
+  let spotifyArmed = false;
   let lastOpenedTrackId = null;
+  let pollTimer = null;
+  let scanOpen = false;
 
   const btn = document.getElementById("toggleBtn");
   const statusEl = document.getElementById("status");
@@ -82,61 +84,60 @@
     return Date.now() - new Date(date).getTime() <= min * 60000;
   }
 
-  async function getGameState() {
-    const { data } = await sb
+  async function loadGameState() {
+    const { data, error } = await sb
       .from("game_state")
       .select("scan_open")
       .eq("id", 1)
       .single();
-    return data?.scan_open === true;
+
+    if (error || !data) return false;
+    return data.scan_open === true;
   }
 
-  function updateButton(open) {
-    btn.textContent = open ? "⛔ Scan sluiten" : "📷 Scan openen";
-    btn.className = open ? "closed" : "open";
-    statusEl.textContent = open
+  function updateUI() {
+    btn.textContent = scanOpen ? "⛔ Scan sluiten" : "📷 Scan openen";
+    btn.className = scanOpen ? "closed" : "open";
+    statusEl.textContent = scanOpen
       ? "Scan is open – wacht op nummer"
       : "Scan is gesloten";
   }
 
   async function toggleGameState() {
-    const open = await getGameState();
+    const newState = !scanOpen;
 
     await sb
       .from("game_state")
-      .update({ scan_open: !open })
+      .update({ scan_open: newState })
       .eq("id", 1);
 
-    updateButton(!open);
-
-    // 👇 hier gebeurt het verschil
-    spotifyArmed = !open;          // alleen bij openen
+    scanOpen = newState;
+    spotifyArmed = newState;
     lastOpenedTrackId = null;
+
+    updateUI();
+    handlePolling();
   }
 
   async function checkLatestTrack() {
-    const open = await getGameState();
-    updateButton(open);
+    if (!scanOpen || !spotifyArmed) return;
 
-    if (!open || !spotifyArmed) return;
-
-    const { data } = await sb
+    const { data, error } = await sb
       .from("spotify_tracks")
       .select("spotify_uri, created_at")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (!data) return;
+    if (error || !data) return;
     if (!isYoungerThanMinutes(data.created_at, MAX_AGE_MINUTES)) return;
 
     const trackId = data.spotify_uri?.split(":")[2];
     if (!trackId || trackId === lastOpenedTrackId) return;
 
     lastOpenedTrackId = trackId;
-    spotifyArmed = false; // 👈 maar 1x openen per scan-open
+    spotifyArmed = false;
 
-    // ✅ HIER opent Spotify — geen blanco tab
     window.open(
       `https://open.spotify.com/track/${trackId}`,
       "_blank"
@@ -145,13 +146,28 @@
     statusEl.textContent = "🎵 Spotify nummer gestart";
   }
 
-  btn.addEventListener("click", toggleGameState);
+  function handlePolling() {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
 
-  checkLatestTrack();
-  setInterval(checkLatestTrack, CHECK_INTERVAL);
+    if (scanOpen) {
+      pollTimer = setInterval(checkLatestTrack, CHECK_INTERVAL);
+    }
+  }
+
+  // INIT
+  scanOpen = await loadGameState();
+  updateUI();
+  handlePolling();
+
+  btn.addEventListener("click", toggleGameState);
 </script>
+
 
 
 </body>
 </html>
+
 
