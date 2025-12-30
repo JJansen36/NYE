@@ -125,17 +125,24 @@ async function openGame() {
   updateButton();
   statusEl.textContent = "Game open – scan een QR";
 
+  // 🔑 BASELINE: alles wat NU bestaat is oud
+  const { data } = await sb
+    .from("scan_events")
+    .select("id")
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  lastSeenScanId = data?.id ?? 0;
+
   await sb.from("game_state").update({
     scan_open: true
   }).eq("id", 1);
 
-  // 👇 DIRECT de laatste scan tonen (indien aanwezig)
-  await checkForScan();
-
-  // 👇 DAARNA pas gaan pollen voor nieuwe scans
   pollTimer = setInterval(checkForScan, CHECK_INTERVAL);
   closeTimer = setTimeout(closeGame, GAME_TIMEOUT_MS);
 }
+
 
 
 async function closeGame() {
@@ -166,12 +173,12 @@ async function checkForScan() {
 
   if (!ev || !ev.code) return;
 
-  // alleen nieuwe scans t.o.v. baseline
+  // ❌ alles van vóór openen negeren
   if (ev.id <= lastSeenScanId) return;
 
+  // ✅ eerste scan NA openen
   lastSeenScanId = ev.id;
 
-  // 👉 TONEN (geen 'al gebruikt'-logica meer)
   linkBox.innerHTML = `
     <a href="${ev.code}" target="_blank">
       ▶️ ${ev.code}
@@ -180,9 +187,9 @@ async function checkForScan() {
 
   statusEl.textContent = "Nieuwe scan ontvangen – klik om te spelen";
 
-  // game sluiten zodra er een scan is
   closeGame();
 }
+
 
 /* ===========================
    EVENTS
