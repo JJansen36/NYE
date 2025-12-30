@@ -112,11 +112,20 @@ window.revealAnswer = async function () {
   }
 
   // 2️⃣ Bijbehorende spotify_track ophalen
-  const { data: track, error: trackError } = await sb
-    .from("spotify_tracks")
-    .select("title, artist, release_year")
-    .eq("scan_event_id", scan.id)
-    .single();
+const { data: tracks, error: trackError } = await sb
+  .from("spotify_tracks")
+  .select("title, artist, release_year")
+  .eq("scan_event_id", scan.id)
+  .order("created_at", { ascending: false })
+  .limit(1);
+
+if (trackError || !tracks || tracks.length === 0) {
+  console.error("❌ Geen spotify_track gevonden", trackError);
+  return;
+}
+
+const track = tracks[0];
+
 
   if (trackError || !track) {
     console.error("❌ Geen spotify_track gevonden", trackError);
