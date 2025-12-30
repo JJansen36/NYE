@@ -62,20 +62,26 @@ function setStatus(msg, cls="muted") {
 }
 
 async function registerCode(rawText) {
+  setStatus("⏳ Controleren…");
 
-  // 🔐 SERVER-CHECK
-  const { data: gameState } = await sb
+  // 🔐 Check of scannen is toegestaan
+  const { data: gameState, error } = await sb
     .from("game_state")
     .select("scan_open, scan_until")
     .eq("id", 1)
     .single();
 
-  if (!gameState.scan_open || (gameState.scan_until && new Date(gameState.scan_until) < new Date())) {
+  if (error || !gameState?.scan_open) {
     setStatus("🚫 Scan niet toegestaan", "bad");
     return;
   }
 
-  // 🔒 DIRECT sluiten (race-proof)
+  if (gameState.scan_until && new Date(gameState.scan_until) < new Date()) {
+    setStatus("⏰ Scan verlopen", "bad");
+    return;
+  }
+
+  // 🔒 Meteen sluiten (race-proof)
   await sb
     .from("game_state")
     .update({ scan_open: false })
@@ -88,38 +94,24 @@ async function registerCode(rawText) {
 
   setStatus("⏳ Scan verwerken…");
 
-  /* ==============================
-     ✅ NIEUW: scan_event aanmaken
-     ============================== */
-  const { data: scanEvent, error: scanErr } = await sb
-    .from("scan_events")
-    .insert({})
-    .select()
-    .single();
-
-  if (scanErr || !scanEvent) {
-    setStatus("❌ Scan kon niet worden opgeslagen", "bad");
-    return;
-  }
-
-  const scanEventId = scanEvent.id;
-
-  /* ==============================
-     🔗 EDGE FUNCTION
-     ============================== */
-  await fetch(EDGE_URL, {
+  // 🔗 EDGE FUNCTION regelt ALLES (scan_event + spotify)
+  const res = await fetch(EDGE_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "apikey": sb.supabaseKey
     },
     body: JSON.stringify({
-      scan_event_id: scanEventId, // 🔴 DIT WAS DE ONTBREKENDE SCHAKEL
       code,
       spotify_url: code,
       url: code
     })
   });
+
+  if (!res.ok) {
+    setStatus("❌ Scan kon niet worden opgeslagen", "bad");
+    return;
+  }
 
   setStatus("✅ Scan geaccepteerd", "ok");
 }
