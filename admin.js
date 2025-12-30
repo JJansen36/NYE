@@ -112,7 +112,7 @@ pickRandomBtn.addEventListener("click", async ()=>{
   // Random row: order by random() (prima voor kleine datasets)
   const { data, error } = await sb
     .from("spotify_tracks")
-    .select("id, artist, title, release_year, spotify_url, preview_url, artist_image_url")
+    .select("id, artist, title, release_year, spotify_track_id, image_url")
     .order("id", { ascending: false }) // stable baseline
     .limit(200);
 
