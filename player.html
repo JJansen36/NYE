@@ -101,42 +101,46 @@
     const openBtn = document.getElementById("openBtn");
 
     async function setBaseline() {
-        const { data } = await sb
-            .from("scan_events")
-            .select("id")
-            .order("id", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+    const { data } = await sb
+        .from("scan_events")
+        .select("id")
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-        if (data?.id) {
-            lastSeenId = data.id;
-        }
-        }
+    if (data?.id) {
+        lastSeenId = data.id;
+    }
+    }
+
 
     async function pollLatestScan() {
-  const { data: ev } = await sb
-    .from("scan_events")
-    .select("id, created_at, code")
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    const { data: ev } = await sb
+        .from("scan_events")
+        .select("id, created_at, code")
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-  if (!ev) return;
-  if (ev.id <= lastSeenId) return;
-  if (!ev.code) return;
+    if (!ev || !ev.code) return;
 
-  lastSeenId = ev.id;
+    // 👀 ALTIJD TONEN (ook oude)
+    linkBox.innerHTML = `
+        <a href="${ev.code}" target="_blank">${ev.code}</a>
+    `;
 
-  linkBox.innerHTML = `
-    <a href="${ev.code}" target="_blank">${ev.code}</a>
-  `;
-  statusEl.textContent = "Nieuwe scan ontvangen";
+    // 🔁 ALLEEN NIEUWE AFSpELEN
+    if (ev.id <= lastSeenId) return;
 
-  if (spotifyTab && !spotifyTab.closed) {
-    spotifyTab.location.href = ev.code;
-    spotifyTab.focus();
-  }
-}
+    lastSeenId = ev.id;
+    statusEl.textContent = "Nieuwe scan ontvangen";
+
+    if (spotifyTab && !spotifyTab.closed) {
+        spotifyTab.location.href = ev.code;
+        spotifyTab.focus();
+    }
+    }
+
 
 
     openBtn.addEventListener("click", async () => {
