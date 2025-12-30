@@ -122,50 +122,50 @@
         .eq("id", 1);
     }
 
-    async function getNextScanEvent() {
-      const { data } = await sb
+    async function pollForScan() {
+      if (!scanOpen) return;
+
+      const { data: ev } = await sb
         .from("scan_events")
-        .select("id, created_at, code")   // 👈 code = QR inhoud
+        .select("id, created_at, code")
         .gt("id", lastPlayedScanEventId)
         .order("id", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      return data || null;
+      if (!ev) return;
+      if (!isRecent(ev.created_at)) return;
+      if (!ev.code) return;
+
+      // 🔑 haal Spotify-link uit scan.html?code=
+      let spotifyUrl;
+      try {
+        const wrapper = new URL(ev.code);
+        spotifyUrl = wrapper.searchParams.get("code");
+      } catch {
+        return;
+      }
+
+      if (!spotifyUrl || !spotifyUrl.startsWith("https://open.spotify.com/")) {
+        return;
+      }
+
+      // 🎵 Spotify starten
+      if (spotifyTab && !spotifyTab.closed) {
+        spotifyTab.location.href = spotifyUrl;
+        spotifyTab.focus();
+      }
+
+      await sb.from("game_state").update({
+        scan_open: false,
+        last_played_scan_event_id: ev.id
+      }).eq("id", 1);
+
+      lastPlayedScanEventId = ev.id;
+      closeScan();
+
+      statusEl.textContent = "🎵 Nummer gestart";
     }
-
-async function pollForScan() {
-  if (!scanOpen) return;
-
-  const ev = await sb
-    .from("scan_events")
-    .select("id, created_at, code")
-    .gt("id", lastPlayedScanEventId)
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!ev) return;
-  if (!isRecent(ev.created_at)) return;
-  if (!ev.code) return;
-
-  // 🎵 Spotify starten (toegestaan: navigatie in bestaand tabblad)
-  if (spotifyTab && !spotifyTab.closed) {
-    spotifyTab.location.href = ev.code;
-    spotifyTab.focus?.();
-  }
-
-  await sb.from("game_state").update({
-    scan_open: false,
-    last_played_scan_event_id: ev.id
-  }).eq("id", 1);
-
-  lastPlayedScanEventId = ev.id;
-  closeScan();
-
-  statusEl.textContent = "🎵 Nummer gestart";
-}
-
 
     function startPolling() {
       stopPolling();
@@ -179,21 +179,20 @@ async function pollForScan() {
       }
     }
 
-async function openScan() {
-  // 🔑 USER GESTURE → popup toegestaan
-  spotifyTab = window.open("about:blank", "_blank");
+    async function openScan() {
+      // 🔑 popup openen via user-gesture
+      spotifyTab = window.open("about:blank", "_blank");
 
-  if (!spotifyTab) {
-    statusEl.textContent = "⚠️ Sta popups toe voor deze site";
-    return;
-  }
+      if (!spotifyTab) {
+        statusEl.textContent = "⚠️ Sta popups toe voor deze site";
+        return;
+      }
 
-  scanOpen = true;
-  await sb.from("game_state").update({ scan_open: true }).eq("id", 1);
-  updateUI();
-  startPolling();
-}
-
+      scanOpen = true;
+      await sb.from("game_state").update({ scan_open: true }).eq("id", 1);
+      updateUI();
+      startPolling();
+    }
 
     async function closeScan() {
       scanOpen = false;
