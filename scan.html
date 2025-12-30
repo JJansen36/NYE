@@ -45,6 +45,9 @@
 </div>
 
 <script>
+    const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
+
 const sb = supabase.createClient(
   "https://wjvleduvvjjseunakmcb.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
@@ -122,8 +125,8 @@ const { data: scanEvent, error: scanErr } = await sb
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "apikey": sb.supabaseKey,
-    "Authorization": `Bearer ${sb.supabaseKey}` // 🔥 DIT WAS DE MISSENDE
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${SUPABASE_ANON_KEY}` // ✅ NU ECHT GELDIG
   },
   body: JSON.stringify({
     scan_event_id: scanEventId,
@@ -132,6 +135,7 @@ const { data: scanEvent, error: scanErr } = await sb
     url: code
   })
 });
+
 
 
     const result = await res.json();
