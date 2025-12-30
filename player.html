@@ -1,79 +1,13 @@
-<!doctype html>
-<html lang="nl">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Game Player</title>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-      background: radial-gradient(circle at top, #1a1a24, #000);
-      color: #fff;
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .player {
-      width: 440px;
-      max-width: 92vw;
-      text-align: center;
-    }
-
-    button {
-      padding: 14px 22px;
-      border-radius: 12px;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      margin-bottom: 18px;
-    }
-
-    .open { background: #22c55e; color: #000; }
-    .closed { background: #ef4444; color: #fff; }
-
-    .placeholder {
-      height: 140px;
-      background: #000;
-      border-radius: 14px;
-      opacity: 0.5;
-      margin-bottom: 10px;
-    }
-
-    .status {
-      font-size: 14px;
-      opacity: 0.85;
-    }
-  </style>
-</head>
-
-<body>
-
-<div class="player">
-  <h1>🎮 Game Player</h1>
-
-  <button id="toggleBtn">⏳ laden…</button>
-
-  <div class="placeholder"></div>
-
-  <div class="status" id="status"></div>
-</div>
-
 <script type="module">
   import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./js/config.js";
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const MAX_AGE_MINUTES = 2;
-  const CHECK_INTERVAL = 4000;
+  const CHECK_INTERVAL = 3000;
 
-  let spotifyArmed = false;
-  let lastOpenedTrackId = null;
+  let spotifyArmed = false;     // opent 1x per scan-open
+  let lastOpenedTrackId = null; // voorkomt dubbele opens
   let pollTimer = null;
   let scanOpen = false;
 
@@ -82,6 +16,17 @@
 
   function isYoungerThanMinutes(date, min) {
     return Date.now() - new Date(date).getTime() <= min * 60000;
+  }
+
+  function parseTrackIdFromUrl(url) {
+    if (!url) return null;
+    // spotify:track:xxxx
+    if (url.includes("spotify:track:")) return url.split(":")[2] || null;
+    // https://open.spotify.com/track/xxxx?...
+    if (url.includes("open.spotify.com/track/")) {
+      return url.split("/track/")[1]?.split("?")[0] || null;
+    }
+    return null;
   }
 
   async function loadGameState() {
@@ -99,7 +44,7 @@
     btn.textContent = scanOpen ? "⛔ Scan sluiten" : "📷 Scan openen";
     btn.className = scanOpen ? "closed" : "open";
     statusEl.textContent = scanOpen
-      ? "Scan is open – wacht op nummer"
+      ? "Scan is open – wacht op scan_event"
       : "Scan is gesloten";
   }
 
@@ -112,38 +57,73 @@
       .eq("id", 1);
 
     scanOpen = newState;
-    spotifyArmed = newState;
+    spotifyArmed = newState;      // open 1x per open
     lastOpenedTrackId = null;
 
     updateUI();
     handlePolling();
   }
 
-  async function checkLatestTrack() {
-    if (!scanOpen || !spotifyArmed) return;
-
+  async function getLatestScanEvent() {
+    // We pakken gewoon de laatste scan_event rij (alle kolommen) zodat we niet stuklopen op kolomnamen
     const { data, error } = await sb
-      .from("spotify_tracks")
-      .select("spotify_uri, created_at")
+      .from("scan_events")
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (error || !data) return;
-    if (!isYoungerThanMinutes(data.created_at, MAX_AGE_MINUTES)) return;
+    if (error) return null;
+    return data || null;
+  }
 
-    const trackId = data.spotify_uri?.split(":")[2];
-    if (!trackId || trackId === lastOpenedTrackId) return;
+  async function getTrackIdForScanEvent(scanEvent) {
+    // 1) Probeer direct uit scan_events (als jij daar iets opslaat)
+    //    We checken een paar veelvoorkomende velden zonder hard te falen:
+    const direct =
+      scanEvent.spotify_track_id ||
+      scanEvent.track_id ||
+      scanEvent.spotify_id ||
+      parseTrackIdFromUrl(scanEvent.spotify_url) ||
+      parseTrackIdFromUrl(scanEvent.url) ||
+      parseTrackIdFromUrl(scanEvent.link);
+
+    if (direct) return direct;
+
+    // 2) Anders: lookup in spotify_tracks via scan_event_id
+    const { data, error } = await sb
+      .from("spotify_tracks")
+      .select("spotify_track_id, created_at")
+      .eq("scan_event_id", scanEvent.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data.spotify_track_id || null;
+  }
+
+  async function checkLatestFromScanEvents() {
+    if (!scanOpen || !spotifyArmed) return;
+
+    const ev = await getLatestScanEvent();
+    if (!ev) return;
+
+    // created_at moet bestaan; als jouw scan_events een andere timestamp heeft: pas hier aan
+    if (!ev.created_at) return;
+
+    if (!isYoungerThanMinutes(ev.created_at, MAX_AGE_MINUTES)) return;
+
+    const trackId = await getTrackIdForScanEvent(ev);
+    if (!trackId) return;
+
+    if (trackId === lastOpenedTrackId) return;
 
     lastOpenedTrackId = trackId;
-    spotifyArmed = false;
+    spotifyArmed = false; // 1x openen per scan-open
 
-    window.open(
-      `https://open.spotify.com/track/${trackId}`,
-      "_blank"
-    );
-
-    statusEl.textContent = "🎵 Spotify nummer gestart";
+    window.open(`https://open.spotify.com/track/${trackId}`, "_blank");
+    statusEl.textContent = "🎵 Spotify nummer gestart (via scan_events)";
   }
 
   function handlePolling() {
@@ -151,9 +131,8 @@
       clearInterval(pollTimer);
       pollTimer = null;
     }
-
     if (scanOpen) {
-      pollTimer = setInterval(checkLatestTrack, CHECK_INTERVAL);
+      pollTimer = setInterval(checkLatestFromScanEvents, CHECK_INTERVAL);
     }
   }
 
@@ -164,10 +143,3 @@
 
   btn.addEventListener("click", toggleGameState);
 </script>
-
-
-
-</body>
-</html>
-
-
