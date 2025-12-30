@@ -76,15 +76,31 @@ function setStatus(msg, cls = "muted") {
 =========================== */
 async function registerCode(rawText) {
   let code = rawText;
-
-  // QR kan wrapper zijn: scan.html?code=...
   if (rawText.includes("scan.html?code=")) {
     code = decodeURIComponent(rawText.split("code=")[1]);
   }
+  code = code.trim();
 
+  // ✅ ENIGE POORT: game_state.scan_open
+  setStatus("⏳ Controleren of game open is…");
+  const { data: gs, error: gsErr } = await sb
+    .from("game_state")
+    .select("scan_open")
+    .eq("id", 1)
+    .single();
+
+  if (gsErr) {
+    setStatus("❌ Kan game_state niet lezen", "bad");
+    return;
+  }
+
+  if (!gs?.scan_open) {
+    setStatus("⛔ Game is gesloten", "bad");
+    return;
+  }
+
+  // 🔍 Check “al gebruikt” (blijft zoals je wilde)
   setStatus("⏳ QR controleren…");
-
-  // 🔍 CHECK: is deze QR al gebruikt?
   const { data: existing, error } = await sb
     .from("scan_events")
     .select("id")
@@ -96,21 +112,19 @@ async function registerCode(rawText) {
     setStatus("❌ Fout bij controleren", "bad");
     return;
   }
-
   if (existing) {
     setStatus("❌ Deze QR is al gebruikt", "bad");
     return;
   }
 
-  // ✅ NIEUW → bestaande Edge Function aanroepen
+  // ✅ Nieuw + game open → door naar Edge Function (ongewijzigd)
   setStatus("⏳ Scan verwerken…");
-
   const res = await fetch(EDGE_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "apikey": SUPABASE_ANON_KEY,
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+      "apikey": sb.supabaseKey,
+      "Authorization": `Bearer ${sb.supabaseKey}`
     },
     body: JSON.stringify({ code })
   });

@@ -98,6 +98,8 @@ const CHECK_INTERVAL = 1200;
 /* ===========================
    STATE
 =========================== */
+let baselineCode = null;  // laatst bekende code op moment van openen
+
 let scanOpen = false;
 let pollTimer = null;
 let closeTimer = null;
@@ -117,31 +119,36 @@ function updateButton() {
   btn.className = scanOpen ? "closed" : "open";
 }
 
+async function getLatestCode() {
+  const { data } = await sb
+    .from("scan_events")
+    .select("code")
+    .order("created_at", { ascending: false }) // alleen sorteren
+    .limit(1)
+    .maybeSingle();
+
+  return data?.code ?? null;
+}
+
 /* ===========================
    GAME STATE
 =========================== */
 async function openGame() {
   scanOpen = true;
   updateButton();
-  statusEl.textContent = "Game open – scan een QR";
+  statusEl.textContent = "Game open – wacht op scan…";
+  linkBox.textContent = "Nog geen scan ontvangen";
 
-  // 🔑 BASELINE: alles wat NU bestaat is oud
-  const { data } = await sb
-    .from("scan_events")
-    .select("id")
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // scan_open = true
+  await sb.from("game_state").update({ scan_open: true }).eq("id", 1);
 
-  lastSeenScanId = data?.id ?? 0;
-
-  await sb.from("game_state").update({
-    scan_open: true
-  }).eq("id", 1);
+  // ✅ baseline = huidige laatste code (mag null zijn)
+  baselineCode = await getLatestCode();
 
   pollTimer = setInterval(checkForScan, CHECK_INTERVAL);
   closeTimer = setTimeout(closeGame, GAME_TIMEOUT_MS);
 }
+
 
 
 
@@ -164,31 +171,24 @@ async function closeGame() {
 async function checkForScan() {
   if (!scanOpen) return;
 
-  const { data: ev } = await sb
-    .from("scan_events")
-    .select("id, code")
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const latest = await getLatestCode();
+  if (!latest) return;
 
-  if (!ev || !ev.code) return;
+  // ❌ nog niets nieuws sinds openen
+  if (latest === baselineCode) return;
 
-  // ❌ alles van vóór openen negeren
-  if (ev.id <= lastSeenScanId) return;
-
-  // ✅ eerste scan NA openen
-  lastSeenScanId = ev.id;
+  // ✅ nieuw nummer sinds openen
+  baselineCode = latest;
 
   linkBox.innerHTML = `
-    <a href="${ev.code}" target="_blank">
-      ▶️ ${ev.code}
-    </a>
+    <a href="${latest}" target="_blank">▶️ ${latest}</a>
   `;
-
   statusEl.textContent = "Nieuwe scan ontvangen – klik om te spelen";
 
+  // game sluiten zodra er een scan is
   closeGame();
 }
+
 
 
 /* ===========================
