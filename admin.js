@@ -113,16 +113,24 @@ async function renderTrackPreview() {
 // Vraag activeren
 // -------------------------------
 async function activateQuestion() {
+  const category = categorySelect.value;
+
+  if (!category) {
+    alert("Kies eerst een categorie");
+    return;
+  }
+
   await sb
     .from("quiz_state")
     .update({
-      show_answer: !state.show_answer
+      pending_category: category,
+      show_answer: false
     })
     .eq("id", 1);
 
-
   alert("Categorie klaar! Laat nu scannen.");
 }
+
 
 // -------------------------------
 // UI bindings
