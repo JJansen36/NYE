@@ -97,31 +97,47 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
    REVEAL (HOOFDSCHERM)
 =========================== */
 window.revealAnswer = async function () {
-  const { data, error } = await sb
+
+  // 1️⃣ Laatste scan ophalen
+  const { data: scan, error: scanError } = await sb
     .from("scan_events")
-    .select("title, artist, year")
+    .select("id")
     .order("created_at", { ascending: false })
     .limit(1)
     .single();
 
-  if (error || !data) {
-    console.error("Geen scan om te tonen", error);
+  if (scanError || !scan) {
+    console.error("❌ Geen scan_event gevonden", scanError);
     return;
   }
 
+  // 2️⃣ Bijbehorende spotify_track ophalen
+  const { data: track, error: trackError } = await sb
+    .from("spotify_tracks")
+    .select("title, artist, release_year")
+    .eq("scan_event_id", scan.id)
+    .single();
+
+  if (trackError || !track) {
+    console.error("❌ Geen spotify_track gevonden", trackError);
+    return;
+  }
+
+  // 3️⃣ Antwoord tonen op hoofdscherm
   await sb
     .from("game_reveal")
     .update({
-      title: data.title,
-      artist: data.artist,
-      year: data.year,
+      title: track.title,
+      artist: track.artist,
+      year: track.release_year,
       visible: true,
       updated_at: new Date()
     })
     .eq("id", 1);
 
-  console.log("✅ Antwoord getoond op screen");
+  console.log("✅ Antwoord getoond:", track.title);
 };
+
 
 window.hideAnswer = async function () {
   await sb
