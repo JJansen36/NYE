@@ -207,11 +207,17 @@
 
       if (!isYoungerThanMinutes(ev.created_at, MAX_AGE_MINUTES)) return;
 
-      const trackUrl = await getTrackUrlForScanEvent(ev.id);
-      if (!trackUrl) {
-        // track komt mogelijk nog binnen → blijven wachten
-        statusEl.textContent = "QR ontvangen… track ophalen…";
-        return;
+      let trackUrl = null;
+for (let i = 0; i < 5; i++) {
+  trackUrl = await getTrackUrlForScanEvent(ev.id);
+  if (trackUrl) break;
+  await new Promise(r => setTimeout(r, 400));
+}
+if (!trackUrl) {
+  statusEl.textContent = "QR ontvangen… wachten op Spotify link…";
+  return;
+
+
       }
 
       // ✅ SPEEL IN HET AL GEOPENDE TABBLAD (geen popup-block)
@@ -220,7 +226,16 @@
           // fallback: alsnog proberen te openen (kan geblokt worden)
           spotifyTab = window.open(trackUrl, "_blank");
         } else {
-          spotifyTab.location.href = trackUrl;
+          const embedUrl =
+  trackUrl.includes("/embed/")
+    ? trackUrl
+    : trackUrl.replace(
+        "open.spotify.com/",
+        "open.spotify.com/embed/"
+      );
+
+spotifyTab.location.href = embedUrl + "?autoplay=1";
+
           spotifyTab.focus?.();
         }
       } catch (e) {
