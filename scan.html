@@ -55,6 +55,12 @@ const SUPABASE_ANON_KEY =
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ===========================
+   EDGE FUNCTION
+=========================== */
+const EDGE_URL =
+  "https://wjvleduvvjjseunakmcb.functions.supabase.co/clever-api";
+
+/* ===========================
    UI
 =========================== */
 const statusEl = document.getElementById("status");
@@ -66,98 +72,57 @@ function setStatus(msg, cls = "muted") {
 }
 
 /* ===========================
-   HELPERS
-=========================== */
-async function getSpotifyInfo(spotifyUrl) {
-  const res = await fetch(
-    "https://open.spotify.com/oembed?url=" +
-      encodeURIComponent(spotifyUrl)
-  );
-  if (!res.ok) throw new Error("Spotify oEmbed failed");
-  const data = await res.json();
-
-  return {
-    title: data.title,
-    artist: data.author_name,
-    cover: data.thumbnail_url || null,
-  };
-}
-
-async function getArtistImage(artist) {
-  const searchRes = await fetch(
-    "https://en.wikipedia.org/w/rest.php/v1/search/title?q=" +
-      encodeURIComponent(artist) +
-      "&limit=1"
-  );
-  const search = await searchRes.json();
-  if (!search.pages?.length) return null;
-
-  const pageRes = await fetch(
-    "https://en.wikipedia.org/api/rest_v1/page/summary/" +
-      encodeURIComponent(search.pages[0].title)
-  );
-  const page = await pageRes.json();
-  return page.originalimage?.source || null;
-}
-
-/* ===========================
    CORE LOGIC
 =========================== */
 async function registerCode(rawText) {
-  let spotifyUrl = rawText;
+  let code = rawText;
 
   // QR kan wrapper zijn: scan.html?code=...
   if (rawText.includes("scan.html?code=")) {
-    spotifyUrl = decodeURIComponent(rawText.split("code=")[1]);
+    code = decodeURIComponent(rawText.split("code=")[1]);
   }
 
-  if (!spotifyUrl.startsWith("https://open.spotify.com/track/")) {
-    setStatus("❌ Geen geldige Spotify link", "bad");
-    return;
-  }
+  setStatus("⏳ QR controleren…");
 
-  setStatus("⏳ Spotify info ophalen…");
-
-  // 🔍 Dubbele scan check
-  const { data: existing } = await sb
+  // 🔍 CHECK: is deze QR al gebruikt?
+  const { data: existing, error } = await sb
     .from("scan_events")
     .select("id")
-    .eq("spotify_url", spotifyUrl)
+    .eq("code", code)
     .limit(1)
     .maybeSingle();
 
-  if (existing) {
-    setStatus("❌ Dit nummer is al gescand", "bad");
+  if (error) {
+    setStatus("❌ Fout bij controleren", "bad");
     return;
   }
 
-  try {
-    const spotify = await getSpotifyInfo(spotifyUrl);
-    const artistImage = await getArtistImage(spotify.artist);
-
-    setStatus("⏳ Scan opslaan…");
-
-    const { error } = await sb.from("scan_events").insert({
-      spotify_url: spotifyUrl,
-      title: spotify.title,
-      artist: spotify.artist,
-      year: null,
-      cover_image: spotify.cover,
-      artist_image: artistImage,
-      created_at: new Date().toISOString(),
-    });
-
-    if (error) {
-      console.error(error);
-      setStatus("❌ Opslaan mislukt", "bad");
-      return;
-    }
-
-    setStatus("✅ Scan geaccepteerd", "ok");
-  } catch (err) {
-    console.error(err);
-    setStatus("❌ Fout bij verwerken", "bad");
+  if (existing) {
+    setStatus("❌ Deze QR is al gebruikt", "bad");
+    return;
   }
+
+  // ✅ NIEUW → bestaande Edge Function aanroepen
+  setStatus("⏳ Scan verwerken…");
+
+  const res = await fetch(EDGE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify({ code })
+  });
+
+  const result = await res.json();
+
+  if (!res.ok) {
+    setStatus("❌ " + (result.error || "Scan mislukt"), "bad");
+    return;
+  }
+
+  setStatus("✅ Scan geaccepteerd", "ok");
 }
 
 /* ===========================
@@ -177,7 +142,6 @@ document.getElementById("btnScan").onclick = async () => {
   );
 };
 </script>
-
 
 </body>
 </html>
