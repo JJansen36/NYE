@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Spotify Quiz — Admin</title>
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="supabase.js"></script>
 </head>
+
 <body>
   <div class="container">
     <div class="topbar">
@@ -24,7 +26,7 @@
     <div class="grid" style="grid-template-columns: 1.2fr 1fr 1fr;">
       <!-- VRAAG -->
       <div class="card">
-        <div style="font-size:16px;font-weight:900;margin-bottom:10px;">Vraag</div>
+        <div class="h2">Vraag</div>
 
         <label class="small">Categorie</label>
         <select id="category" class="input">
@@ -34,59 +36,54 @@
           <option value="photo">4) Foto (vaag → helder)</option>
         </select>
 
-        <div style="height:10px"></div>
-
-        <div class="row">
+        <div class="row" style="margin-top:10px">
           <button class="primary" id="pickRandom">🎲 Random track</button>
           <button id="activate">✅ Activeer vraag</button>
         </div>
 
         <div class="row" style="margin-top:10px">
-          <button id="toggleAnswer">👁️ Toon/Verberg antwoord</button>
+          <button id="toggleAnswer">👁️ Toon / verberg antwoord</button>
           <button class="danger" id="clearQuestion">🧹 Clear vraag</button>
         </div>
 
         <hr class="sep"/>
 
         <div class="small">Geselecteerde track</div>
-        <div style="font-weight:900;margin-top:6px" id="trackTitle">—</div>
-        <div class="sub" id="trackMeta">—</div>
+        <div id="trackTitle" class="bold">—</div>
+        <div id="trackMeta" class="sub">—</div>
 
-        <div style="margin-top:10px" class="small">Voorbeeld vraag</div>
-        <div style="font-weight:900;margin-top:6px" id="previewQ">—</div>
+        <div class="small" style="margin-top:10px">Voorbeeld vraag</div>
+        <div id="previewQ" class="bold">—</div>
+
         <div class="small" style="margin-top:6px">Antwoord</div>
-        <div style="font-weight:900;color:var(--accent);margin-top:6px" id="previewA">—</div>
-
-        <div class="small" style="margin-top:10px">
-          Sneltoetsen: <span class="kbd">1</span> Team links +1 • <span class="kbd">2</span> Team rechts +1 • <span class="kbd">A</span> antwoord toggle
-        </div>
+        <div id="previewA" class="bold accent">—</div>
       </div>
 
-      <!-- TEAM 1 -->
+      <!-- TEAM LINKS -->
       <div class="card">
-        <div style="font-size:16px;font-weight:900;margin-bottom:10px;">Team Links</div>
+        <div class="h2">Team Links</div>
         <input id="t1Name" class="input" placeholder="Teamnaam" />
-        <div style="height:10px"></div>
         <input id="t1Score" class="input" type="number" placeholder="Score" />
+
         <div class="controls">
-          <button class="primary" data-team="1" data-delta="1">+1</button>
+          <button data-team="1" data-delta="1" class="primary">+1</button>
           <button data-team="1" data-delta="-1">-1</button>
-          <button class="primary" data-team="1" data-delta="5">+5</button>
+          <button data-team="1" data-delta="5" class="primary">+5</button>
           <button data-team="1" data-delta="-5">-5</button>
           <button data-save="1">💾 Opslaan</button>
         </div>
       </div>
 
-      <!-- TEAM 2 -->
+      <!-- TEAM RECHTS -->
       <div class="card">
-        <div style="font-size:16px;font-weight:900;margin-bottom:10px;">Team Rechts</div>
+        <div class="h2">Team Rechts</div>
         <input id="t2Name" class="input" placeholder="Teamnaam" />
-        <div style="height:10px"></div>
         <input id="t2Score" class="input" type="number" placeholder="Score" />
+
         <div class="controls">
-          <button class="primary" data-team="2" data-delta="1">+1</button>
+          <button data-team="2" data-delta="1" class="primary">+1</button>
           <button data-team="2" data-delta="-1">-1</button>
-          <button class="primary" data-team="2" data-delta="5">+5</button>
+          <button data-team="2" data-delta="5" class="primary">+5</button>
           <button data-team="2" data-delta="-5">-5</button>
           <button data-save="2">💾 Opslaan</button>
         </div>
@@ -94,23 +91,20 @@
     </div>
 
     <div class="card" style="margin-top:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div class="row">
         <div>
-          <div style="font-size:16px;font-weight:900;">Reset / nieuw spel</div>
-          <div class="sub">Leegt quiz_questions, zet scores op 0 en wist actieve vraag</div>
+          <div class="h2">Nieuw spel</div>
+          <div class="sub">Reset scores en actieve vraag</div>
         </div>
-        <div class="controls">
-          <button class="danger" id="resetGame">🧨 Reset game</button>
-        </div>
-      </div>
-      <div class="small" style="margin-top:10px;">
-        Dit doet dezelfde acties als <span class="kbd">sql/reset.sql</span>, maar dan via de client (vereist open policies).
+        <button class="danger" id="resetGame">🧨 Reset game</button>
       </div>
     </div>
-
   </div>
 
-  <script type="module" src="admin.js"></script>
+  <!-- Global Supabase client -->
+  <script src="supabase.js"></script>
 
+  <!-- Admin logic -->
+  <script src="admin.js"></script>
 </body>
 </html>

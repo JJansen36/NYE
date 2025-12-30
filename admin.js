@@ -1,169 +1,164 @@
 // ===============================
-// SUPABASE
+// ADMIN.JS — Spotify Quiz
+// Werkt met GLOBAL Supabase (window.sb)
 // ===============================
-import { sb } from "./supabase.js";
 
-// ===============================
-// HELPERS
-// ===============================
-function extractSpotifyTrackId(code) {
+const sb = window.sb;
+console.log("🛠️ admin.js gestart", sb);
+
+// -------------------------------
+// Helpers
+// -------------------------------
+const $ = id => document.getElementById(id);
+
+function extractTrackId(code) {
   if (!code) return null;
-  const match = code.match(/track\/([a-zA-Z0-9]+)/);
-  return match ? match[1] : null;
+  const m = code.match(/track\/([a-zA-Z0-9]+)/);
+  return m ? m[1] : null;
 }
 
-// ===============================
-// STATE
-// ===============================
+// -------------------------------
+// State
+// -------------------------------
 let lastScanPerTeam = {};
 let activeTeamId = null;
-let activeCategory = "year";
 
-// ===============================
-// INIT
-// ===============================
+// -------------------------------
+// Init
+// -------------------------------
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  console.log("🟢 Admin init");
-
+  await loadTeams();
   await loadLastScans();
   bindUI();
+  $("status").textContent = "Verbonden ✅";
 }
 
-// ===============================
-// LOAD LAST SCANS PER TEAM
-// ===============================
-async function loadLastScans() {
-  console.log("📥 Laden laatste scans per team...");
+// -------------------------------
+// Teams laden
+// -------------------------------
+async function loadTeams() {
+  const { data } = await sb.from("quiz_teams").select("*").order("id");
+  if (!data) return;
 
-  const { data, error } = await sb
-    .from("scan_events")
-    .select("id, team_id, code, created_at")
-    .order("created_at", { ascending: false });
+  const t1 = data.find(t => t.id === 1);
+  const t2 = data.find(t => t.id === 2);
 
-  if (error) {
-    console.error("❌ scan_events fout", error);
-    return;
+  if (t1) {
+    $("t1Name").value = t1.name ?? "";
+    $("t1Score").value = t1.score ?? 0;
   }
 
-  // laatste scan per team bepalen
+  if (t2) {
+    $("t2Name").value = t2.name ?? "";
+    $("t2Score").value = t2.score ?? 0;
+  }
+}
+
+// -------------------------------
+// Laatste scans ophalen
+// -------------------------------
+async function loadLastScans() {
+  const { data } = await sb
+    .from("scan_events")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  lastScanPerTeam = {};
   data.forEach(scan => {
     if (!lastScanPerTeam[scan.team_id]) {
       lastScanPerTeam[scan.team_id] = scan;
     }
   });
 
-  console.log("✅ Laatste scans:", lastScanPerTeam);
-
-  // standaard team kiezen
-  activeTeamId = Object.keys(lastScanPerTeam)[0] || null;
-
-  renderScanInfo();
+  activeTeamId = Object.keys(lastScanPerTeam)[0] ?? null;
+  renderTrackPreview();
 }
 
-// ===============================
-// RENDER INFO
-// ===============================
-async function renderScanInfo() {
-  if (!activeTeamId) {
-    console.warn("⚠️ Geen actieve teamscan");
-    return;
-  }
+// -------------------------------
+// Track preview
+// -------------------------------
+async function renderTrackPreview() {
+  if (!activeTeamId) return;
 
   const scan = lastScanPerTeam[activeTeamId];
-  const trackId = extractSpotifyTrackId(scan.code);
+  const trackId = extractTrackId(scan.code);
+  if (!trackId) return;
 
-  console.log("🎵 Actieve scan:", scan);
-  console.log("🎯 Track ID:", trackId);
-
-  if (!trackId) {
-    console.warn("❌ Geen track ID uit code");
-    return;
-  }
-
-  const { data: track, error } = await sb
+  const { data: track } = await sb
     .from("spotify_tracks")
-    .select(`
-      id,
-      title,
-      artist,
-      artists,
-      release_year,
-      preview_url,
-      image_url,
-      track_id
-    `)
+    .select("*")
     .eq("track_id", trackId)
     .single();
 
-  if (error) {
-    console.error("❌ spotify_tracks lookup fout", error);
-    return;
-  }
+  if (!track) return;
 
-  console.log("✅ Gekoppelde track:", track);
+  $("trackTitle").textContent = track.title;
+  $("trackMeta").textContent = track.artist;
 
-  // ---- HIER KUN JE LATER UI VULLEN ----
-  // Voor nu alleen console (bewust)
+  const cat = $("category").value;
+  $("previewQ").textContent =
+    cat === "year" ? "In welk jaar kwam dit nummer uit?"
+    : cat === "artist_title" ? "Wie is de artiest en titel?"
+    : cat === "intro" ? "Welk nummer hoor je?"
+    : "Welke artiest is dit?";
+
+  $("previewA").textContent =
+    cat === "year" ? track.release_year
+    : `${track.artist} — ${track.title}`;
 }
 
-// ===============================
-// UI BINDINGS
-// ===============================
-function bindUI() {
-  const categorySelect = document.getElementById("categorySelect");
-  if (categorySelect) {
-    categorySelect.addEventListener("change", e => {
-      activeCategory = e.target.value;
-      console.log("📂 Categorie:", activeCategory);
-    });
-  }
-
-  const teamButtons = document.querySelectorAll("[data-team]");
-  teamButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      activeTeamId = btn.dataset.team;
-      console.log("👥 Actief team:", activeTeamId);
-      renderScanInfo();
-    });
-  });
-
-  const activateBtn = document.getElementById("activateQuestion");
-  if (activateBtn) {
-    activateBtn.addEventListener("click", activateQuestion);
-  }
-}
-
-// ===============================
-// ACTIVATE QUESTION (STATE)
-// ===============================
+// -------------------------------
+// Vraag activeren
+// -------------------------------
 async function activateQuestion() {
-  if (!activeTeamId) {
-    alert("Geen team geselecteerd");
-    return;
-  }
+  if (!activeTeamId) return alert("Geen actieve scan");
 
-  const scan = lastScanPerTeam[activeTeamId];
-
-  const { error } = await sb
+  await sb
     .from("quiz_state")
     .update({
       active_team_id: activeTeamId,
-      active_category: activeCategory,
-      active_scan_event_id: scan.id,
+      active_category: $("category").value,
+      active_scan_event_id: lastScanPerTeam[activeTeamId].id,
       show_answer: false
     })
     .eq("id", 1);
+}
 
-  if (error) {
-    console.error("❌ quiz_state update fout", error);
-    return;
-  }
+// -------------------------------
+// UI bindings
+// -------------------------------
+function bindUI() {
+  $("activate").onclick = activateQuestion;
 
-  console.log("🚀 Vraag geactiveerd", {
-    team: activeTeamId,
-    category: activeCategory,
-    scan: scan.id
+  $("toggleAnswer").onclick = async () => {
+    const { data } = await sb.from("quiz_state").select("show_answer").eq("id", 1).single();
+    await sb.from("quiz_state").update({ show_answer: !data.show_answer }).eq("id", 1);
+  };
+
+  $("clearQuestion").onclick = async () => {
+    await sb.from("quiz_state").update({
+      active_scan_event_id: null,
+      active_category: null,
+      show_answer: false
+    }).eq("id", 1);
+  };
+
+  document.querySelectorAll("[data-team]").forEach(btn => {
+    btn.onclick = () => {
+      activeTeamId = btn.dataset.team;
+      renderTrackPreview();
+    };
+  });
+
+  document.querySelectorAll("[data-save]").forEach(btn => {
+    btn.onclick = async () => {
+      const id = Number(btn.dataset.save);
+      const name = $(id === 1 ? "t1Name" : "t2Name").value;
+      const score = Number($(id === 1 ? "t1Score" : "t2Score").value);
+
+      await sb.from("quiz_teams").update({ name, score }).eq("id", id);
+    };
   });
 }
