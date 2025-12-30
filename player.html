@@ -100,44 +100,59 @@
     const statusEl = document.getElementById("status");
     const openBtn = document.getElementById("openBtn");
 
+    async function setBaseline() {
+        const { data } = await sb
+            .from("scan_events")
+            .select("id")
+            .order("id", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (data?.id) {
+            lastSeenId = data.id;
+        }
+        }
+
     async function pollLatestScan() {
-      const { data: ev } = await sb
-        .from("scan_events")
-        .select("id, created_at, code")
-        .order("id", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  const { data: ev } = await sb
+    .from("scan_events")
+    .select("id, created_at, code")
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-      if (!ev) return;
-      if (ev.id === lastSeenId) return;
-      if (!ev.code) return;
+  if (!ev) return;
+  if (ev.id <= lastSeenId) return;
+  if (!ev.code) return;
 
-      lastSeenId = ev.id;
+  lastSeenId = ev.id;
 
-      // 👉 toon altijd de link
-      linkBox.innerHTML = `
-        <a href="${ev.code}" target="_blank">${ev.code}</a>
-      `;
-      statusEl.textContent = "Nieuwe scan ontvangen";
+  linkBox.innerHTML = `
+    <a href="${ev.code}" target="_blank">${ev.code}</a>
+  `;
+  statusEl.textContent = "Nieuwe scan ontvangen";
 
-      // 👉 probeer Spotify te openen
-      if (spotifyTab && !spotifyTab.closed) {
-        spotifyTab.location.href = ev.code;
-        spotifyTab.focus();
-      }
-    }
+  if (spotifyTab && !spotifyTab.closed) {
+    spotifyTab.location.href = ev.code;
+    spotifyTab.focus();
+  }
+}
 
-    openBtn.addEventListener("click", () => {
-      // user-gesture → popup toegestaan
-      spotifyTab = window.open("about:blank", "_blank");
-      if (!spotifyTab) {
-        statusEl.textContent = "❌ Popup geblokkeerd";
-        return;
-      }
 
-      statusEl.textContent = "Luisteren actief – scan een QR";
-      pollTimer = setInterval(pollLatestScan, CHECK_INTERVAL);
-    });
+    openBtn.addEventListener("click", async () => {
+  spotifyTab = window.open("about:blank", "_blank");
+  if (!spotifyTab) {
+    statusEl.textContent = "❌ Popup geblokkeerd";
+    return;
+  }
+
+  // 🔑 alles wat al bestaat is oud
+  await setBaseline();
+
+  statusEl.textContent = "Luisteren actief – wacht op nieuwe scan";
+  pollTimer = setInterval(pollLatestScan, CHECK_INTERVAL);
+});
+
   </script>
 </body>
 </html>
