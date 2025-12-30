@@ -148,36 +148,52 @@ async function checkScan() {
   const { data: ev } = await sb
     .from("scan_events")
     .select("id, code")
-    .order("id",{ascending:false})
+    .order("id", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (!ev || !ev.code) return;
 
-  // altijd tonen
-  if (ev.id <= lastPlayedId) {
+  // 🔹 ALTIJD TONEN
+  const isUsed = ev.id <= lastPlayedId;
+
+  if (isUsed) {
     linkBox.innerHTML = `
       <span class="used">Al gebruikt</span><br>
       ${ev.code}
     `;
+    statusEl.textContent = "Deze QR is al gebruikt";
     return;
   }
 
-  // nieuw nummer
-  lastPlayedId = ev.id;
-
+  // 🔹 NIEUW → KLIKBAAR
   linkBox.innerHTML = `
-    <a href="${ev.code}" target="_blank">▶️ ${ev.code}</a>
+    <a href="#" id="playLink">▶️ ${ev.code}</a>
   `;
+  statusEl.textContent = "Nieuwe QR ontvangen – klik om te spelen";
 
-  statusEl.textContent = "Nieuwe scan ontvangen";
+  const playLink = document.getElementById("playLink");
 
-  await sb.from("game_state").update({
-    last_played_scan_event_id: ev.id,
-    scan_open:false
-  }).eq("id",1);
+  playLink.addEventListener("click", async (e) => {
+    e.preventDefault();
 
-  closeGame();
+    window.open(ev.code, "_blank");
+
+    lastPlayedId = ev.id;
+
+    await sb.from("game_state").update({
+      last_played_scan_event_id: ev.id,
+      scan_open: false
+    }).eq("id", 1);
+
+    closeGame();
+
+    linkBox.innerHTML = `
+      <span class="used">Al gebruikt</span><br>
+      ${ev.code}
+    `;
+    statusEl.textContent = "Nummer afgespeeld";
+  });
 }
 
 /* ---------------- events ---------------- */
