@@ -2,11 +2,14 @@
 <html lang="nl">
 <head>
   <meta charset="utf-8" />
-  <title>Quiz – Antwoord</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🎵 Quiz Antwoord</title>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     body {
+      margin: 0;
       background: #000;
       color: #fff;
       font-family: system-ui, sans-serif;
@@ -14,49 +17,76 @@
       align-items: center;
       justify-content: center;
       height: 100vh;
-      margin: 0;
-      text-align: center;
+      overflow: hidden;
     }
+
     .card {
+      text-align: center;
       opacity: 0;
-      transition: opacity 0.6s ease;
+      transform: scale(0.95);
+      transition: opacity 0.6s ease, transform 0.6s ease;
     }
+
     .card.show {
       opacity: 1;
+      transform: scale(1);
     }
-    h1 { font-size: 64px; margin: 0; }
-    h2 { font-size: 48px; margin: 12px 0; opacity: 0.9; }
-    .year { font-size: 40px; opacity: 0.7; }
+
+    .title {
+      font-size: 64px;
+      font-weight: 700;
+    }
+
+    .artist {
+      font-size: 48px;
+      margin-top: 16px;
+      opacity: 0.9;
+    }
+
+    .year {
+      font-size: 40px;
+      margin-top: 12px;
+      opacity: 0.7;
+    }
   </style>
 </head>
+
 <body>
 
 <div id="card" class="card">
-  <h1 id="title"></h1>
-  <h2 id="artist"></h2>
+  <div class="title" id="title"></div>
+  <div class="artist" id="artist"></div>
   <div class="year" id="year"></div>
 </div>
 
-<script>
-const sb = supabase.createClient(
-  "https://wjvleduvvjjseunakmcb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
-);
+<script type="module">
+/* ===========================
+   SUPABASE
+=========================== */
+const SUPABASE_URL = "https://wjvleduvvjjseunakmcb.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
 
-// realtime luisteren
-sb.channel("reveal")
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ===========================
+   REALTIME LISTENER
+=========================== */
+sb.channel("game-reveal")
   .on(
     "postgres_changes",
     { event: "UPDATE", schema: "public", table: "game_reveal" },
     payload => {
       const data = payload.new;
+      const card = document.getElementById("card");
+
       if (data.visible) {
-        document.getElementById("title").textContent = data.title;
-        document.getElementById("artist").textContent = data.artist;
-        document.getElementById("year").textContent = data.year;
-        document.getElementById("card").classList.add("show");
+        document.getElementById("title").textContent = data.title ?? "";
+        document.getElementById("artist").textContent = data.artist ?? "";
+        document.getElementById("year").textContent = data.year ?? "";
+        card.classList.add("show");
       } else {
-        document.getElementById("card").classList.remove("show");
+        card.classList.remove("show");
       }
     }
   )
