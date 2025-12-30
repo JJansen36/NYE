@@ -65,93 +65,31 @@ function setStatus(msg, cls = "muted") {
 }
 
 async function registerCode(rawText) {
-  try {
-    /* ==============================
-       🔐 GAME STATE CHECK
-       ============================== */
-    const { data: gameState, error: gsErr } = await sb
-      .from("game_state")
-      .select("scan_open, scan_until")
-      .eq("id", 1)
-      .single();
-
-    if (gsErr || !gameState?.scan_open) {
-      setStatus("🚫 Scan niet toegestaan", "bad");
-      return;
-    }
-
-    if (gameState.scan_until && new Date(gameState.scan_until) < new Date()) {
-      setStatus("🚫 Scan verlopen", "bad");
-      return;
-    }
-
-    /* ==============================
-       🔒 DIRECT sluiten
-       ============================== */
-    await sb.from("game_state").update({ scan_open: false }).eq("id", 1);
-
-    let code = rawText;
-    if (rawText.includes("scan.html?code=")) {
-      code = decodeURIComponent(rawText.split("code=")[1]);
-    }
-
-    setStatus("⏳ Scan verwerken…");
-
-    /* ==============================
-       ✅ scan_event aanmaken
-       ============================== */
-const { data: scanEvent, error: scanErr } = await sb
-  .from("scan_events")
-  .insert({
-    code: code   // 🔥 DIT WAS VERPLICHT
-  })
-  .select("id")
-  .single();
-
-
-    if (scanErr || !scanEvent?.id) {
-      console.error("scan_event error", scanErr);
-      setStatus("❌ Scan kon niet worden opgeslagen", "bad");
-      return;
-    }
-
-    const scanEventId = scanEvent.id;
-    console.log("✅ scan_event_id:", scanEventId);
-
-    /* ==============================
-       🔗 EDGE FUNCTION
-       ============================== */
-    const res = await fetch(EDGE_URL, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "apikey": SUPABASE_ANON_KEY,
-    "Authorization": `Bearer ${SUPABASE_ANON_KEY}` // ✅ NU ECHT GELDIG
-  },
-  body: JSON.stringify({
-    scan_event_id: scanEventId,
-    code,
-    spotify_url: code,
-    url: code
-  })
-});
-
-
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      console.error("EDGE ERROR", result);
-      setStatus("❌ Scan kon niet worden opgeslagen", "bad");
-      return;
-    }
-
-    setStatus("✅ Scan geaccepteerd", "ok");
-
-  } catch (err) {
-    console.error("SCAN FATAL", err);
-    setStatus("❌ Onbekende fout", "bad");
+  let code = rawText;
+  if (rawText.includes("scan.html?code=")) {
+    code = decodeURIComponent(rawText.split("code=")[1]);
   }
+
+  setStatus("⏳ Scan verwerken…");
+
+  const res = await fetch(EDGE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": sb.supabaseKey,
+      "Authorization": `Bearer ${sb.supabaseKey}`
+    },
+    body: JSON.stringify({ code })
+  });
+
+  const result = await res.json();
+
+  if (!res.ok) {
+    setStatus("❌ " + (result.error || "Scan mislukt"), "bad");
+    return;
+  }
+
+  setStatus("✅ Scan geaccepteerd", "ok");
 }
 
 document.getElementById("btnScan").onclick = async () => {
