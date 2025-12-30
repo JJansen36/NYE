@@ -38,7 +38,7 @@
     .closed { background: #ef4444; color: #fff; }
 
     .box {
-      height: 140px;
+      height: 120px;
       background: #000;
       border-radius: 14px;
       opacity: 0.6;
@@ -67,7 +67,7 @@
     <button id="toggleBtn">⏳ laden…</button>
 
     <div class="box" id="infoBox">
-      Klik op “Scan openen” om een nieuwe ronde te starten.
+      Klik op “Scan openen” om te starten
     </div>
 
     <div class="status" id="status"></div>
@@ -79,7 +79,7 @@
 
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const CHECK_INTERVAL = 1200;
+    const CHECK_INTERVAL = 1000;
     const MAX_AGE_MINUTES = 2;
 
     let scanOpen = false;
@@ -100,11 +100,11 @@
 
       infoBox.textContent = scanOpen
         ? "Wachten op QR-scan…"
-        : "Klik op “Scan openen” om een nieuwe ronde te starten.";
+        : "Klik op “Scan openen” om te starten";
 
       statusEl.textContent = scanOpen
-        ? "Scan is open"
-        : "Scan is gesloten";
+        ? "Scan actief"
+        : "Scan gesloten";
     }
 
     async function loadState() {
@@ -114,18 +114,17 @@
         .eq("id", 1)
         .single();
 
-      if (data) {
-        lastPlayedScanEventId = data.last_played_scan_event_id ?? 0;
-      }
+      lastPlayedScanEventId = data?.last_played_scan_event_id ?? 0;
 
-      // altijd gesloten starten
-      await sb.from("game_state").update({ scan_open: false }).eq("id", 1);
+      await sb.from("game_state")
+        .update({ scan_open: false })
+        .eq("id", 1);
     }
 
     async function getNextScanEvent() {
       const { data } = await sb
         .from("scan_events")
-        .select("id, created_at")
+        .select("id, created_at, code")   // 👈 code = QR inhoud
         .gt("id", lastPlayedScanEventId)
         .order("id", { ascending: false })
         .limit(1)
@@ -134,27 +133,18 @@
       return data || null;
     }
 
-    async function getSpotifyUrl(scanEventId) {
-      const { data } = await sb
-        .from("spotify_tracks")
-        .select("spotify_url")
-        .eq("scan_event_id", scanEventId)
-        .maybeSingle();
-
-      return data?.spotify_url || null;
-    }
-
     async function pollForScan() {
       if (!scanOpen) return;
 
       const ev = await getNextScanEvent();
-      if (!ev || !isRecent(ev.created_at)) return;
+      if (!ev) return;
+      if (!isRecent(ev.created_at)) return;
 
-      const trackUrl = await getSpotifyUrl(ev.id);
-      if (!trackUrl) return;
+      const url = ev.code;
+      if (!url || !url.startsWith("http")) return;
 
-      // 🎵 START SPOTIFY IN NIEUW TABBLAD
-      window.open(trackUrl, "_blank");
+      // 🎵 START SPOTIFY ZOALS BIJ ECHTE QR
+      window.open(url, "_blank");
 
       await sb.from("game_state").update({
         scan_open: false,
@@ -162,7 +152,7 @@
       }).eq("id", 1);
 
       lastPlayedScanEventId = ev.id;
-      await closeScan();
+      closeScan();
 
       statusEl.textContent = "🎵 Nummer gestart";
     }
@@ -193,18 +183,12 @@
       stopPolling();
     }
 
-    async function onToggle() {
-      if (!scanOpen) {
-        await openScan();
-      } else {
-        await closeScan();
-      }
-    }
+    btn.addEventListener("click", () => {
+      scanOpen ? closeScan() : openScan();
+    });
 
-    // INIT
     await loadState();
     updateUI();
-    btn.addEventListener("click", onToggle);
   </script>
 </body>
 </html>
