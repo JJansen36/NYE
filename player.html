@@ -1,3 +1,69 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Game Player</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: radial-gradient(circle at top, #1a1a24, #000);
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .player {
+      width: 440px;
+      max-width: 92vw;
+      text-align: center;
+    }
+
+    button {
+      padding: 14px 22px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      margin-bottom: 18px;
+    }
+
+    .open { background: #22c55e; color: #000; }
+    .closed { background: #ef4444; color: #fff; }
+
+    .placeholder {
+      height: 140px;
+      background: #000;
+      border-radius: 14px;
+      opacity: 0.5;
+      margin-bottom: 10px;
+    }
+
+    .status {
+      font-size: 14px;
+      opacity: 0.85;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="player">
+  <h1>🎮 Game Player</h1>
+
+  <button id="toggleBtn">⏳ laden…</button>
+
+  <div class="placeholder"></div>
+
+  <div class="status" id="status"></div>
+</div>
+
 <script type="module">
   import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./js/config.js";
 
@@ -143,3 +209,7 @@
 
   btn.addEventListener("click", toggleGameState);
 </script>
+
+
+</body>
+</html>
