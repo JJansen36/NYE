@@ -26,125 +26,118 @@
       border: none;
       cursor: pointer;
     }
-    #qrReader {
-      margin-top: 16px;
-    }
+    #qrReader { margin-top: 16px; }
     .ok { color: #4ade80; }
     .bad { color: #f87171; }
     .muted { color: #9ca3af; }
   </style>
 
   <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
 <div class="box">
   <h2>QR scannen</h2>
-  <div id="status" class="muted">Klaar om te scannen</div>
-  <button id="btnScan" type="button">📷 Scan QR-code</button>
+  <div id="status" class="muted">Wachten op speler…</div>
+  <button id="btnScan">📷 Scan QR-code</button>
   <div id="qrReader"></div>
 </div>
 
 <script>
-console.log("scan.html geladen");
+const sb = supabase.createClient(
+  "https://wjvleduvvjjseunakmcb.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
+);
 
 const EDGE_URL =
   "https://wjvleduvvjjseunakmcb.functions.supabase.co/clever-api";
 
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
-
 const statusEl = document.getElementById("status");
-const btnScan = document.getElementById("btnScan");
-let qr = null;
+let qr;
 
-function setStatus(msg, cls = "muted") {
-  statusEl.className = cls;
+function setStatus(msg, cls="muted") {
   statusEl.textContent = msg;
+  statusEl.className = cls;
 }
 
 async function registerCode(rawText) {
-  let code = rawText;
 
-  // QR bevat scan.html?code=...
+  // 🔐 SERVER-CHECK
+  const { data: gameState } = await sb
+    .from("game_state")
+    .select("scan_open, scan_until")
+    .eq("id", 1)
+    .single();
+
+  if (!gameState.scan_open || (gameState.scan_until && new Date(gameState.scan_until) < new Date())) {
+    setStatus("🚫 Scan niet toegestaan", "bad");
+    return;
+  }
+
+  // 🔒 DIRECT sluiten (race-proof)
+  await sb
+    .from("game_state")
+    .update({ scan_open: false })
+    .eq("id", 1);
+
+  let code = rawText;
   if (rawText.includes("scan.html?code=")) {
     code = decodeURIComponent(rawText.split("code=")[1]);
   }
 
-  console.log("➡️ DOORSTUREN NAAR EDGE:", code);
-  setStatus("⏳ Code verwerken…");
+  setStatus("⏳ Scan verwerken…");
 
-  try {
-    const res = await fetch(EDGE_URL, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "apikey": SUPABASE_ANON_KEY,
-    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-  },
-  body: JSON.stringify({
-    code: code,
-    spotify_url: code,
-    url: code
-  })
-});
+  /* ==============================
+     ✅ NIEUW: scan_event aanmaken
+     ============================== */
+  const { data: scanEvent, error: scanErr } = await sb
+    .from("scan_events")
+    .insert({})
+    .select()
+    .single();
 
-let data = null;
-const text = await res.text();
-
-try {
-  data = JSON.parse(text);
-} catch {
-  data = { error: text };
-}
-
-console.log("⬅️ Edge response:", data);
-
-if (!res.ok) {
-  setStatus(`❌ ${data.error || "Opslaan mislukt"}`, "bad");
-  return;
-}
-
-setStatus(
-  `✅ ${data.spotify_track?.title ?? "Code verwerkt"}`,
-  "ok"
-);
-
-
-  } catch (err) {
-    console.error("❌ Netwerk/JS fout:", err);
-    setStatus("❌ Netwerkfout", "bad");
+  if (scanErr || !scanEvent) {
+    setStatus("❌ Scan kon niet worden opgeslagen", "bad");
+    return;
   }
+
+  const scanEventId = scanEvent.id;
+
+  /* ==============================
+     🔗 EDGE FUNCTION
+     ============================== */
+  await fetch(EDGE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": sb.supabaseKey
+    },
+    body: JSON.stringify({
+      scan_event_id: scanEventId, // 🔴 DIT WAS DE ONTBREKENDE SCHAKEL
+      code,
+      spotify_url: code,
+      url: code
+    })
+  });
+
+  setStatus("✅ Scan geaccepteerd", "ok");
 }
 
-btnScan.onclick = async () => {
-  try {
-    setStatus("📷 Camera starten…");
-    qr = new Html5Qrcode("qrReader");
-
-    await qr.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
-      async (text) => {
-        await qr.stop();
-        qr.clear();
-        registerCode(text.trim());
-      }
-    );
-
-    setStatus("Scan een QR-code");
-  } catch {
-    setStatus("❌ Camera niet beschikbaar", "bad");
-  }
+document.getElementById("btnScan").onclick = async () => {
+  qr = new Html5Qrcode("qrReader");
+  await qr.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    async (text) => {
+      await qr.stop();
+      qr.clear();
+      registerCode(text.trim());
+    }
+  );
 };
-
-// Fallback: direct openen via ?code=...
-const params = new URLSearchParams(window.location.search);
-const codeFromUrl = params.get("code");
-if (codeFromUrl) {
-  registerCode(codeFromUrl);
-}
 </script>
+
 
 </body>
 </html>
