@@ -18,30 +18,19 @@
       align-items: center;
       justify-content: center;
     }
-
-    .player {
-      width: 440px;
-      max-width: 92vw;
-      text-align: center;
-    }
-
+    .player { width: 440px; max-width: 92vw; text-align: center; }
     button {
-      padding: 14px 22px;
-      border-radius: 12px;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      margin-bottom: 18px;
+      padding: 14px 22px; border-radius: 12px; border: none;
+      font-size: 16px; cursor: pointer; margin-bottom: 18px;
     }
-
     .open { background: #22c55e; color: #000; }
     .closed { background: #ef4444; color: #fff; }
 
     .box {
-      height: 120px;
+      height: 140px;
       background: #000;
       border-radius: 14px;
-      opacity: 0.6;
+      opacity: 0.7;
       margin-bottom: 10px;
       display:flex;
       align-items:center;
@@ -50,13 +39,10 @@
       padding:14px;
       box-sizing:border-box;
       line-height:1.4;
+      text-align:left;
+      white-space:pre-wrap;
     }
-
-    .status {
-      font-size: 14px;
-      opacity: 0.85;
-      min-height: 20px;
-    }
+    .status { font-size: 14px; opacity: 0.9; min-height: 20px; }
   </style>
 </head>
 
@@ -66,9 +52,7 @@
 
     <button id="toggleBtn">⏳ laden…</button>
 
-    <div class="box" id="infoBox">
-      Klik op “Scan openen” om te starten
-    </div>
+    <div class="box" id="infoBox">Laden…</div>
 
     <div class="status" id="status"></div>
   </div>
@@ -76,11 +60,10 @@
   <script type="module">
     const SUPABASE_URL = "https://wjvleduvvjjseunakmcb.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
-
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const CHECK_INTERVAL = 1000;
-    const MAX_AGE_MINUTES = 2;
+    const MAX_AGE_MINUTES = 10; // 👈 tijdelijk ruimer zodat “te oud” geen blocker is
 
     let spotifyTab = null;
     let scanOpen = false;
@@ -95,17 +78,17 @@
       return Date.now() - new Date(dateStr).getTime() < MAX_AGE_MINUTES * 60000;
     }
 
-    function updateUI() {
+    function updateUI(extra = "") {
       btn.textContent = scanOpen ? "⛔ Scan sluiten" : "📷 Scan openen";
       btn.className = scanOpen ? "closed" : "open";
 
-      infoBox.textContent = scanOpen
-        ? "Wachten op QR-scan…"
-        : "Klik op “Scan openen” om te starten";
+      statusEl.textContent = scanOpen ? "Scan actief" : "Scan gesloten";
 
-      statusEl.textContent = scanOpen
-        ? "Scan actief"
-        : "Scan gesloten";
+      infoBox.textContent =
+`lastPlayedScanEventId: ${lastPlayedScanEventId}
+scanOpen: ${scanOpen}
+tabOpen: ${!!spotifyTab && !spotifyTab.closed}
+${extra}`;
     }
 
     async function loadState() {
@@ -117,43 +100,68 @@
 
       lastPlayedScanEventId = data?.last_played_scan_event_id ?? 0;
 
-      await sb.from("game_state")
-        .update({ scan_open: false })
-        .eq("id", 1);
+      // altijd gesloten starten
+      await sb.from("game_state").update({ scan_open: false }).eq("id", 1);
     }
 
-async function pollForScan() {
-  if (!scanOpen) return;
+    async function getLatestScanId() {
+      const { data } = await sb
+        .from("scan_events")
+        .select("id")
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data?.id ?? null;
+    }
 
-  const { data: ev } = await sb
-    .from("scan_events")
-    .select("id, created_at, code")
-    .gt("id", lastPlayedScanEventId)
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    async function pollForScan() {
+      if (!scanOpen) return;
 
-  if (!ev) return;
-  if (!isRecent(ev.created_at)) return;
-  if (!ev.code) return;
+      // Tabblad dicht? Dan kan browser geen nieuwe openen vanuit polling.
+      if (!spotifyTab || spotifyTab.closed) {
+        updateUI("⚠️ Spotify-tabblad is dicht. Klik opnieuw op “Scan openen”.");
+        return;
+      }
 
-  // 🎵 GEWOON DE SPOTIFY-LINK OPENEN
-  if (spotifyTab && !spotifyTab.closed) {
-    spotifyTab.location.href = ev.code;
-    spotifyTab.focus();
-  }
+      const { data: ev } = await sb
+        .from("scan_events")
+        .select("id, created_at, code")
+        .gt("id", lastPlayedScanEventId)
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-  await sb.from("game_state").update({
-    scan_open: false,
-    last_played_scan_event_id: ev.id
-  }).eq("id", 1);
+      if (!ev) {
+        updateUI("Wachten op nieuwe scan…");
+        return;
+      }
 
-  lastPlayedScanEventId = ev.id;
-  closeScan();
+      const url = (ev.code || "").trim();
 
-  statusEl.textContent = "🎵 Nummer gestart";
-}
+      updateUI(
+        `Laatste event gevonden:
+id: ${ev.id}
+created_at: ${ev.created_at}
+code/url: ${url}`
+      );
 
+      if (!url.startsWith("http")) return;
+      if (!isRecent(ev.created_at)) return;
+
+      // ✅ NAVIGEER bestaand tabblad naar Spotify
+      spotifyTab.location.href = url;
+      spotifyTab.focus?.();
+
+      await sb.from("game_state").update({
+        scan_open: false,
+        last_played_scan_event_id: ev.id
+      }).eq("id", 1);
+
+      lastPlayedScanEventId = ev.id;
+      await closeScan();
+
+      statusEl.textContent = "🎵 Nummer geopend in nieuw tabblad";
+    }
 
     function startPolling() {
       stopPolling();
@@ -168,17 +176,22 @@ async function pollForScan() {
     }
 
     async function openScan() {
-      // 🔑 popup openen via user-gesture
+      // 🔑 User gesture: nu mag window.open
       spotifyTab = window.open("about:blank", "_blank");
-
       if (!spotifyTab) {
-        statusEl.textContent = "⚠️ Sta popups toe voor deze site";
+        updateUI("⚠️ Popup geblokkeerd. Sta pop-ups toe voor deze site.");
         return;
+      }
+
+      // ✅ baseline: voorkom dat een oude scan meteen opnieuw afgaat
+      const latestId = await getLatestScanId();
+      if (latestId !== null) {
+        lastPlayedScanEventId = Math.max(lastPlayedScanEventId, latestId);
       }
 
       scanOpen = true;
       await sb.from("game_state").update({ scan_open: true }).eq("id", 1);
-      updateUI();
+      updateUI("Scan open. Baseline gezet. Wachten op nieuwe scan…");
       startPolling();
     }
 
@@ -194,7 +207,7 @@ async function pollForScan() {
     });
 
     await loadState();
-    updateUI();
+    updateUI("Klaar om te starten.");
   </script>
 </body>
 </html>
