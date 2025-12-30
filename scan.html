@@ -45,17 +45,24 @@
 </div>
 
 <script>
-    const SUPABASE_ANON_KEY =
+/* ===========================
+   SUPABASE
+=========================== */
+const SUPABASE_URL = "https://wjvleduvvjjseunakmcb.supabase.co";
+const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
 
-const sb = supabase.createClient(
-  "https://wjvleduvvjjseunakmcb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
-);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/* ===========================
+   EDGE FUNCTION
+=========================== */
 const EDGE_URL =
   "https://wjvleduvvjjseunakmcb.functions.supabase.co/clever-api";
 
+/* ===========================
+   UI
+=========================== */
 const statusEl = document.getElementById("status");
 let qr;
 
@@ -64,20 +71,46 @@ function setStatus(msg, cls = "muted") {
   statusEl.className = cls;
 }
 
+/* ===========================
+   CORE LOGIC
+=========================== */
 async function registerCode(rawText) {
   let code = rawText;
+
+  // QR kan wrapper zijn: scan.html?code=...
   if (rawText.includes("scan.html?code=")) {
     code = decodeURIComponent(rawText.split("code=")[1]);
   }
 
+  setStatus("⏳ QR controleren…");
+
+  // 🔍 CHECK: is deze QR al gebruikt?
+  const { data: existing, error } = await sb
+    .from("scan_events")
+    .select("id")
+    .eq("code", code)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    setStatus("❌ Fout bij controleren", "bad");
+    return;
+  }
+
+  if (existing) {
+    setStatus("❌ Deze QR is al gebruikt", "bad");
+    return;
+  }
+
+  // ✅ NIEUW → bestaande Edge Function aanroepen
   setStatus("⏳ Scan verwerken…");
 
   const res = await fetch(EDGE_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "apikey": sb.supabaseKey,
-      "Authorization": `Bearer ${sb.supabaseKey}`
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
     },
     body: JSON.stringify({ code })
   });
@@ -92,8 +125,12 @@ async function registerCode(rawText) {
   setStatus("✅ Scan geaccepteerd", "ok");
 }
 
+/* ===========================
+   QR SCANNER
+=========================== */
 document.getElementById("btnScan").onclick = async () => {
   qr = new Html5Qrcode("qrReader");
+
   await qr.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: 250 },
@@ -105,8 +142,6 @@ document.getElementById("btnScan").onclick = async () => {
   );
 };
 </script>
-
-
 
 </body>
 </html>
