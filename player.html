@@ -43,154 +43,249 @@
       border-radius: 14px;
       opacity: 0.5;
       margin-bottom: 10px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:14px;
+      padding:14px;
+      box-sizing:border-box;
+      line-height:1.3;
     }
 
     .status {
       font-size: 14px;
       opacity: 0.85;
+      min-height: 20px;
     }
   </style>
 </head>
 
 <body>
+  <div class="player">
+    <h1>🎮 Game Player</h1>
 
-<div class="player">
-  <h1>🎮 Game Player</h1>
+    <button id="toggleBtn">⏳ laden…</button>
 
-  <button id="toggleBtn">⏳ laden…</button>
+    <div class="placeholder" id="hintBox">
+      Klik op “Scan openen”. Er opent direct een nieuw tabblad dat wacht op de QR-scan.
+    </div>
 
- <iframe
-  id="spotifyPlayer"
-  style="width:100%; height:152px; border-radius:14px; border:none; display:none;"
-  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture">
-</iframe>
+    <div class="status" id="status"></div>
+  </div>
 
+  <script type="module">
+    import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./js/config.js";
 
-  <div class="status" id="status"></div>
-</div>
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-<script type="module">
-  import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./js/config.js";
+    const MAX_AGE_MINUTES = 2;
+    const CHECK_INTERVAL = 1200; // sneller reageren
 
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let scanOpen = false;
+    let pollTimer = null;
+    let lastPlayedScanEventId = 0;
 
-  const MAX_AGE_MINUTES = 2;
-  const CHECK_INTERVAL = 3000;
+    // Dit is de “wacht-tab” die we openen op de knop-klik
+    let spotifyTab = null;
 
-  let scanOpen = false;
-  let pollTimer = null;
-  let lastPlayedScanEventId = null;
+    const btn = document.getElementById("toggleBtn");
+    const statusEl = document.getElementById("status");
+    const hintBox = document.getElementById("hintBox");
 
-  const btn = document.getElementById("toggleBtn");
-  const statusEl = document.getElementById("status");
+    function isYoungerThanMinutes(date, min) {
+      return Date.now() - new Date(date).getTime() <= min * 60000;
+    }
 
-  /* ---------------- helpers ---------------- */
-  function isYoungerThanMinutes(date, min) {
-    return Date.now() - new Date(date).getTime() <= min * 60000;
-  }
+    function updateUI() {
+      btn.textContent = scanOpen ? "⛔ Scan sluiten" : "📷 Scan openen";
+      btn.className = scanOpen ? "closed" : "open";
 
-  function updateUI() {
-    btn.textContent = scanOpen ? "⛔ Scan sluiten" : "📷 Scan openen";
-    btn.className = scanOpen ? "closed" : "open";
-    statusEl.textContent = scanOpen
-      ? "Scan is open – wacht op QR"
-      : "Scan is gesloten";
-  }
+      if (scanOpen) {
+        statusEl.textContent = "Scan is open – wacht op QR…";
+        hintBox.textContent = "Nieuw tabblad staat klaar. Scan nu een QR code.";
+      } else {
+        statusEl.textContent = "Scan is gesloten";
+        hintBox.textContent = "Klik op “Scan openen”. Er opent direct een nieuw tabblad dat wacht op de QR-scan.";
+      }
+    }
 
-  /* ---------------- state ---------------- */
-  async function loadGameState() {
-    const { data, error } = await sb
-      .from("game_state")
-      .select("scan_open, last_played_scan_event_id")
-      .eq("id", 1)
-      .single();
+    async function loadGameState() {
+      const { data, error } = await sb
+        .from("game_state")
+        .select("scan_open, last_played_scan_event_id")
+        .eq("id", 1)
+        .single();
 
-    if (error || !data) return;
+      if (error || !data) return;
 
-    scanOpen = data.scan_open === true;
-    lastPlayedScanEventId = data.last_played_scan_event_id ?? 0;
-  }
+      scanOpen = data.scan_open === true;
+      lastPlayedScanEventId = data.last_played_scan_event_id ?? 0;
+    }
 
-  async function toggleGameState() {
-    scanOpen = !scanOpen;
+    async function setGameState(open) {
+      await sb
+        .from("game_state")
+        .update({ scan_open: open })
+        .eq("id", 1);
 
-    await sb
-      .from("game_state")
-      .update({ scan_open: scanOpen })
-      .eq("id", 1);
+      scanOpen = open;
+      updateUI();
+      handlePolling();
+    }
+
+    function openWaitingSpotifyTab() {
+      // Popup moet DIRECT uit de button click komen
+      spotifyTab = window.open("", "_blank");
+      if (!spotifyTab) {
+        statusEl.textContent = "⚠️ Popup geblokkeerd. Sta popups toe voor deze site en probeer opnieuw.";
+        return false;
+      }
+
+      // Kleine “wachtpagina” in dat tabblad
+      try {
+        spotifyTab.document.open();
+        spotifyTab.document.write(`
+          <!doctype html><html><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Wachten op scan…</title>
+          <style>
+            body{font-family:system-ui,sans-serif;background:#0f0f14;color:#fff;margin:0;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;padding:24px;}
+            .box{max-width:520px}
+            .small{opacity:.8;font-size:14px;margin-top:10px}
+          </style>
+          </head><body>
+            <div class="box">
+              <div style="font-size:22px">📷 Wachten op QR-scan…</div>
+              <div class="small">Laat dit tabblad open. Zodra er gescand is, ga ik automatisch naar Spotify.</div>
+            </div>
+          </body></html>
+        `);
+        spotifyTab.document.close();
+      } catch (e) {
+        // sommige browsers blokkeren document.write; geen probleem
+      }
+
+      return true;
+    }
+
+    async function getLatestUnusedScanEvent() {
+      const { data } = await sb
+        .from("scan_events")
+        .select("id, created_at")
+        .gt("id", lastPlayedScanEventId)     // 👈 nooit herhalen
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      return data || null;
+    }
+
+    async function getTrackUrlForScanEvent(scanEventId) {
+      // kan soms nét later worden toegevoegd → daarom blijven we pollen tot hij er is
+      const { data } = await sb
+        .from("spotify_tracks")
+        .select("spotify_url")
+        .eq("scan_event_id", scanEventId)
+        .maybeSingle();
+
+      return data?.spotify_url || null;
+    }
+
+    async function checkForScanAndPlay() {
+      if (!scanOpen) return;
+
+      // als tab dicht is door gebruiker, stop dan netjes
+      if (spotifyTab && spotifyTab.closed) {
+        spotifyTab = null;
+        statusEl.textContent = "Tabblad gesloten. Klik opnieuw op ‘Scan openen’.";
+        await setGameState(false);
+        return;
+      }
+
+      const ev = await getLatestUnusedScanEvent();
+      if (!ev) return;
+
+      if (!isYoungerThanMinutes(ev.created_at, MAX_AGE_MINUTES)) return;
+
+      const trackUrl = await getTrackUrlForScanEvent(ev.id);
+      if (!trackUrl) {
+        // track komt mogelijk nog binnen → blijven wachten
+        statusEl.textContent = "QR ontvangen… track ophalen…";
+        return;
+      }
+
+      // ✅ SPEEL IN HET AL GEOPENDE TABBLAD (geen popup-block)
+      try {
+        if (!spotifyTab || spotifyTab.closed) {
+          // fallback: alsnog proberen te openen (kan geblokt worden)
+          spotifyTab = window.open(trackUrl, "_blank");
+        } else {
+          spotifyTab.location.href = trackUrl;
+          spotifyTab.focus?.();
+        }
+      } catch (e) {
+        // fallback
+        window.open(trackUrl, "_blank");
+      }
+
+      // ✅ markeer als gespeeld + sluit scan
+      await sb
+        .from("game_state")
+        .update({
+          scan_open: false,
+          last_played_scan_event_id: ev.id
+        })
+        .eq("id", 1);
+
+      scanOpen = false;
+      lastPlayedScanEventId = ev.id;
+
+      updateUI();
+      handlePolling();
+
+      statusEl.textContent = "🎵 Nummer gestart – scan gesloten";
+    }
+
+    function handlePolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      if (scanOpen) {
+        pollTimer = setInterval(checkForScanAndPlay, CHECK_INTERVAL);
+      }
+    }
+
+    async function onToggleClick() {
+      if (!scanOpen) {
+        // OPENEN
+        const ok = openWaitingSpotifyTab();
+        if (!ok) return;
+
+        await setGameState(true);
+        statusEl.textContent = "Scan open. Wacht op QR…";
+      } else {
+        // SLUITEN
+        await setGameState(false);
+        statusEl.textContent = "Scan gesloten";
+      }
+    }
+
+    // init
+    await loadGameState();
+
+    // Als scanOpen al true staat vanuit vorige sessie,
+    // zetten we hem liever UIT (anders “hangt” hij).
+    // En we forceren opnieuw openen via knop, zodat tabblad goed werkt.
+    if (scanOpen) {
+      scanOpen = false;
+      await sb.from("game_state").update({ scan_open: false }).eq("id", 1);
+    }
 
     updateUI();
     handlePolling();
-  }
 
-  /* ---------------- scan logic ---------------- */
-  async function getLatestUnusedScanEvent() {
-    const { data } = await sb
-      .from("scan_events")
-      .select("id, created_at")
-      .gt("id", lastPlayedScanEventId)          // 👈 cruciaal
-      .order("id", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    return data || null;
-  }
-
-  async function getTrackUrlForScanEvent(scanEventId) {
-    const { data } = await sb
-      .from("spotify_tracks")
-      .select("spotify_url")
-      .eq("scan_event_id", scanEventId)
-      .maybeSingle();
-
-    return data?.spotify_url || null;
-  }
-
- async function checkLatestFromScanEvents() {
-  if (!scanOpen) return;
-
-  const ev = await getLatestUnusedScanEvent();
-  if (!ev) return;
-  if (!isYoungerThanMinutes(ev.created_at, MAX_AGE_MINUTES)) return;
-
-  const trackUrl = await getTrackUrlForScanEvent(ev.id);
-  if (!trackUrl) return;
-
-  const iframe = document.getElementById("spotifyPlayer");
-  const embedUrl = trackUrl.replace(
-    "open.spotify.com/",
-    "open.spotify.com/embed/"
-  );
-
-  iframe.src = embedUrl + "?autoplay=1";
-  iframe.style.display = "block";
-
-  await sb.from("game_state").update({
-    scan_open: false,
-    last_played_scan_event_id: ev.id
-  }).eq("id", 1);
-
-  scanOpen = false;
-  lastPlayedScanEventId = ev.id;
-
-  updateUI();
-  handlePolling();
-
-  statusEl.textContent = "🎵 Nummer gestart – scan gesloten";
-}
-
-
-  /* ---------------- init ---------------- */
-  await loadGameState();
-  updateUI();
-  handlePolling();
-
-  btn.addEventListener("click", toggleGameState);
-</script>
-
-
-
-
-
+    btn.addEventListener("click", onToggleClick);
+  </script>
 </body>
 </html>
