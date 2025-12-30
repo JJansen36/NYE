@@ -119,16 +119,20 @@ const { data: scanEvent, error: scanErr } = await sb
        🔗 EDGE FUNCTION
        ============================== */
     const res = await fetch(EDGE_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": sb.supabaseKey
-      },
-      body: JSON.stringify({
-        code,
-        scan_event_id: scanEventId
-      })
-    });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "apikey": sb.supabaseKey,
+    "Authorization": `Bearer ${sb.supabaseKey}` // 🔥 DIT WAS DE MISSENDE
+  },
+  body: JSON.stringify({
+    scan_event_id: scanEventId,
+    code,
+    spotify_url: code,
+    url: code
+  })
+});
+
 
     const result = await res.json();
 
