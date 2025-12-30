@@ -134,16 +134,17 @@
     return data || null;
   }
 
-  async function getTrackIdForScanEvent(scanEvent) {
-    const { data } = await sb
-      .from("spotify_tracks")
-      .select("spotify_track_id")
-      .eq("scan_event_id", scanEvent.id)
-      .limit(1)
-      .maybeSingle();
+async function getTrackUrlForScanEvent(scanEvent) {
+  const { data } = await sb
+    .from("spotify_tracks")
+    .select("spotify_url")
+    .eq("scan_event_id", scanEvent.id)
+    .limit(1)
+    .maybeSingle();
 
-    return data?.spotify_track_id || null;
-  }
+  return data?.spotify_url || null;
+}
+
 
   async function checkLatestFromScanEvents() {
     if (!scanOpen || !spotifyArmed) return;
@@ -162,14 +163,11 @@
     // ⏱ ouder dan 2 minuten → negeren
     if (!isYoungerThanMinutes(ev.created_at, MAX_AGE_MINUTES)) return;
 
-    const trackId = await getTrackIdForScanEvent(ev);
-    if (!trackId) return;
+const trackUrl = await getTrackUrlForScanEvent(ev);
+if (!trackUrl) return;
 
-    // 🎵 Spotify openen
-    window.open(
-      `https://open.spotify.com/track/${trackId}`,
-      "_blank"
-    );
+window.open(trackUrl, "_blank");
+
 
     // ✅ markeer scan als gebruikt + sluit scan
     await sb
