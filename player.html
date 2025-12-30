@@ -1,162 +1,192 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Spotify Player – Test</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Game Player</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-      background: #0f0f14;
-      color: #fff;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+<style>
+body {
+  margin:0;
+  font-family:system-ui, sans-serif;
+  background:#0f0f14;
+  color:#fff;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
 
-    .card {
-      width: 520px;
-      max-width: 95vw;
-      background: #000;
-      border-radius: 16px;
-      padding: 24px;
-      box-sizing: border-box;
-    }
+.player {
+  width:520px;
+  max-width:95vw;
+  background:#000;
+  border-radius:16px;
+  padding:24px;
+  box-sizing:border-box;
+}
 
-    h1 {
-      margin-top: 0;
-      font-size: 22px;
-    }
+h1 { margin-top:0 }
 
-    button {
-      padding: 12px 18px;
-      border-radius: 10px;
-      border: none;
-      cursor: pointer;
-      font-size: 15px;
-      background: #22c55e;
-      color: #000;
-      margin-bottom: 16px;
-    }
+button {
+  padding:14px 22px;
+  border-radius:12px;
+  border:none;
+  font-size:16px;
+  cursor:pointer;
+}
 
-    .label {
-      font-size: 13px;
-      opacity: 0.8;
-      margin-top: 12px;
-    }
+.open { background:#22c55e; color:#000 }
+.closed { background:#ef4444; color:#fff }
 
-    .linkbox {
-      margin-top: 6px;
-      background: #111;
-      padding: 12px;
-      border-radius: 8px;
-      word-break: break-all;
-      font-size: 14px;
-    }
+.linkbox {
+  margin-top:16px;
+  background:#111;
+  padding:14px;
+  border-radius:10px;
+  word-break:break-all;
+}
 
-    .linkbox a {
-      color: #4ade80;
-      text-decoration: none;
-    }
+.linkbox a {
+  color:#4ade80;
+  text-decoration:none;
+}
 
-    .status {
-      margin-top: 14px;
-      font-size: 13px;
-      opacity: 0.85;
-    }
-  </style>
+.used {
+  color:#f87171;
+  font-weight:600;
+}
+
+.status {
+  margin-top:12px;
+  font-size:14px;
+  opacity:.9;
+}
+</style>
 </head>
 
 <body>
-  <div class="card">
-    <h1>🎵 Spotify Player – Test</h1>
+<div class="player">
+  <h1>🎮 Game Player</h1>
 
-    <button id="openBtn">Scan luisteren</button>
+  <button id="gameBtn">🎮 Game openen (3 min)</button>
 
-    <div class="label">Laatste gescande link:</div>
-    <div class="linkbox" id="linkBox">— nog niets —</div>
-
-    <div class="status" id="status">Wachten op scan…</div>
+  <div class="linkbox" id="linkBox">
+    Nog geen scan ontvangen
   </div>
 
-  <script type="module">
-    const SUPABASE_URL = "https://wjvleduvvjjseunakmcb.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
+  <div class="status" id="status"></div>
+</div>
 
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<script type="module">
+const SUPABASE_URL = "https://wjvleduvvjjseunakmcb.supabase.co";
+const SUPABASE_ANON_KEY = "PASTE_HIER_JE_ANON_KEY";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const CHECK_INTERVAL = 1500;
+const GAME_TIMEOUT_MS = 3 * 60 * 1000;
+const CHECK_INTERVAL = 1200;
 
-    let pollTimer = null;
-    let lastSeenId = 0;
-    let spotifyTab = null;
+let scanOpen = false;
+let pollTimer = null;
+let closeTimer = null;
+let lastPlayedId = 0;
 
-    const linkBox = document.getElementById("linkBox");
-    const statusEl = document.getElementById("status");
-    const openBtn = document.getElementById("openBtn");
+const btn = document.getElementById("gameBtn");
+const linkBox = document.getElementById("linkBox");
+const statusEl = document.getElementById("status");
 
-    async function setBaseline() {
-    const { data } = await sb
-        .from("scan_events")
-        .select("id")
-        .order("id", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+/* ---------------- helpers ---------------- */
+function setButton() {
+  btn.textContent = scanOpen
+    ? "⛔ Game gesloten"
+    : "🎮 Game openen (3 min)";
+  btn.className = scanOpen ? "closed" : "open";
+}
 
-    if (data?.id) {
-        lastSeenId = data.id;
-    }
-    }
+/* ---------------- game state ---------------- */
+async function openGame() {
+  scanOpen = true;
+  setButton();
+  statusEl.textContent = "Game open – scan een QR";
 
+  const { data } = await sb
+    .from("scan_events")
+    .select("id")
+    .order("id", { ascending:false })
+    .limit(1)
+    .maybeSingle();
 
-    async function pollLatestScan() {
-    const { data: ev } = await sb
-        .from("scan_events")
-        .select("id, created_at, code")
-        .order("id", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  lastPlayedId = data?.id ?? 0;
 
-    if (!ev || !ev.code) return;
+  await sb.from("game_state").update({
+    scan_open: true
+  }).eq("id",1);
 
-    // 👀 ALTIJD TONEN (ook oude)
+  pollTimer = setInterval(checkScan, CHECK_INTERVAL);
+
+  closeTimer = setTimeout(closeGame, GAME_TIMEOUT_MS);
+}
+
+async function closeGame() {
+  scanOpen = false;
+  setButton();
+  statusEl.textContent = "Game gesloten";
+  clearInterval(pollTimer);
+  clearTimeout(closeTimer);
+
+  await sb.from("game_state").update({
+    scan_open:false
+  }).eq("id",1);
+}
+
+/* ---------------- scan logic ---------------- */
+async function checkScan() {
+  if (!scanOpen) return;
+
+  const { data: ev } = await sb
+    .from("scan_events")
+    .select("id, code")
+    .order("id",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+
+  if (!ev || !ev.code) return;
+
+  // altijd tonen
+  if (ev.id <= lastPlayedId) {
     linkBox.innerHTML = `
-        <a href="${ev.code}" target="_blank">${ev.code}</a>
+      <span class="used">Al gebruikt</span><br>
+      ${ev.code}
     `;
-
-    // 🔁 ALLEEN NIEUWE AFSpELEN
-    if (ev.id <= lastSeenId) return;
-
-    lastSeenId = ev.id;
-    statusEl.textContent = "Nieuwe scan ontvangen";
-
-    if (spotifyTab && !spotifyTab.closed) {
-        spotifyTab.location.href = ev.code;
-        spotifyTab.focus();
-    }
-    }
-
-
-
-    openBtn.addEventListener("click", async () => {
-  spotifyTab = window.open("about:blank", "_blank");
-  if (!spotifyTab) {
-    statusEl.textContent = "❌ Popup geblokkeerd";
     return;
   }
 
-  // 🔑 alles wat al bestaat is oud
-  await setBaseline();
+  // nieuw nummer
+  lastPlayedId = ev.id;
 
-  statusEl.textContent = "Luisteren actief – wacht op nieuwe scan";
-  pollTimer = setInterval(pollLatestScan, CHECK_INTERVAL);
+  linkBox.innerHTML = `
+    <a href="${ev.code}" target="_blank">▶️ ${ev.code}</a>
+  `;
+
+  statusEl.textContent = "Nieuwe scan ontvangen";
+
+  await sb.from("game_state").update({
+    last_played_scan_event_id: ev.id,
+    scan_open:false
+  }).eq("id",1);
+
+  closeGame();
+}
+
+/* ---------------- events ---------------- */
+btn.addEventListener("click", () => {
+  if (!scanOpen) openGame();
 });
 
-  </script>
+/* ---------------- init ---------------- */
+setButton();
+</script>
 </body>
 </html>
