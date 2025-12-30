@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>QR scannen</title>
+  <title>QR Scan</title>
 
   <style>
     body {
@@ -14,69 +14,134 @@
       padding: 24px;
       text-align: center;
     }
+    .box {
+      max-width: 360px;
+      margin: 0 auto;
+    }
     button {
-      padding: 14px 20px;
-      font-size: 18px;
-      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 16px;
+      margin-top: 12px;
+      border-radius: 8px;
       border: none;
       cursor: pointer;
-      background: #fff;
-      color: #000;
     }
-    .status {
-      margin-top: 16px;
-      opacity: 0.85;
-    }
-    .error { color: #f87171; }
+    #qrReader { margin-top: 16px; }
     .ok { color: #4ade80; }
+    .bad { color: #f87171; }
+    .muted { color: #9ca3af; }
   </style>
 
-  <!-- Supabase -->
+  <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js"></script>
 </head>
-
 <body>
 
-  <h1>QR scannen</h1>
+<div class="box">
+  <h2>QR scannen</h2>
+  <div id="status" class="muted">Wachten op speler…</div>
+  <button id="btnScan">📷 Scan QR-code</button>
+  <div id="qrReader"></div>
+</div>
 
-  <div id="info" class="status">
-    ⏳ Wacht tot de categorie is gekozen…
-  </div>
+<script>
+/* ===========================
+   SUPABASE
+=========================== */
+const SUPABASE_URL = "https://wjvleduvvjjseunakmcb.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
 
-  <button id="scanBtn">📷 Scan QR-code</button>
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  <script>
-    const info = document.getElementById("info");
-    const scanBtn = document.getElementById("scanBtn");
+/* ===========================
+   EDGE FUNCTION
+=========================== */
+const EDGE_URL =
+  "https://wjvleduvvjjseunakmcb.functions.supabase.co/clever-api";
 
-    scanBtn.onclick = async () => {
-      info.textContent = "📡 Scannen gestart…";
+/* ===========================
+   UI
+=========================== */
+const statusEl = document.getElementById("status");
+let qr;
 
-      const code = prompt("Plak of scan de Spotify link:");
-      if (!code) {
-        info.textContent = "❌ Geen code gescand";
-        info.className = "status error";
-        return;
-      }
+function setStatus(msg, cls = "muted") {
+  statusEl.textContent = msg;
+  statusEl.className = cls;
+}
 
-      // ✅ ENIGE JUISTE MANIER
-      const { data, error } = await window.sb.functions.invoke(
-        "clever-api",
-        { body: { code } }
-      );
+/* ===========================
+   CORE LOGIC
+=========================== */
+async function registerCode(rawText) {
+  let code = rawText;
 
-      if (error) {
-        console.error(error);
-        info.textContent = "❌ Fout bij opslaan";
-        info.className = "status error";
-        return;
-      }
+  // QR kan wrapper zijn: scan.html?code=...
+  if (rawText.includes("scan.html?code=")) {
+    code = decodeURIComponent(rawText.split("code=")[1]);
+  }
 
-      info.textContent = "✅ Scan ontvangen! Wacht op de quiz…";
-      info.className = "status ok";
-    };
-  </script>
+  setStatus("⏳ QR controleren…");
+
+  // 🔍 CHECK: is deze QR al gebruikt?
+  const { data: existing, error } = await sb
+    .from("scan_events")
+    .select("id")
+    .eq("code", code)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    setStatus("❌ Fout bij controleren", "bad");
+    return;
+  }
+
+  if (existing) {
+    setStatus("❌ Deze QR is al gebruikt", "bad");
+    return;
+  }
+
+  // ✅ NIEUW → bestaande Edge Function aanroepen
+  setStatus("⏳ Scan verwerken…");
+
+  const res = await fetch(EDGE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify({ code })
+  });
+
+  const result = await res.json();
+
+  if (!res.ok) {
+    setStatus("❌ " + (result.error || "Scan mislukt"), "bad");
+    return;
+  }
+
+  setStatus("✅ Scan geaccepteerd", "ok");
+}
+
+/* ===========================
+   QR SCANNER
+=========================== */
+document.getElementById("btnScan").onclick = async () => {
+  qr = new Html5Qrcode("qrReader");
+
+  await qr.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    async (text) => {
+      await qr.stop();
+      qr.clear();
+      registerCode(text.trim());
+    }
+  );
+};
+</script>
 
 </body>
 </html>
