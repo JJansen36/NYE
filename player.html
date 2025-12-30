@@ -59,7 +59,12 @@
 
   <button id="toggleBtn">⏳ laden…</button>
 
-  <div class="placeholder"></div>
+ <iframe
+  id="spotifyPlayer"
+  style="width:100%; height:152px; border-radius:14px; border:none; display:none;"
+  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture">
+</iframe>
+
 
   <div class="status" id="status"></div>
 </div>
@@ -141,48 +146,39 @@
     return data?.spotify_url || null;
   }
 
-  async function checkLatestFromScanEvents() {
-    if (!scanOpen) return;
+ async function checkLatestFromScanEvents() {
+  if (!scanOpen) return;
 
-    const ev = await getLatestUnusedScanEvent();
-    if (!ev) return;
+  const ev = await getLatestUnusedScanEvent();
+  if (!ev) return;
+  if (!isYoungerThanMinutes(ev.created_at, MAX_AGE_MINUTES)) return;
 
-    // ⏱ te oud → negeren
-    if (!isYoungerThanMinutes(ev.created_at, MAX_AGE_MINUTES)) return;
+  const trackUrl = await getTrackUrlForScanEvent(ev.id);
+  if (!trackUrl) return;
 
-    const trackUrl = await getTrackUrlForScanEvent(ev.id);
-    if (!trackUrl) return;
+  const iframe = document.getElementById("spotifyPlayer");
+  const embedUrl = trackUrl.replace(
+    "open.spotify.com/",
+    "open.spotify.com/embed/"
+  );
 
-    // ▶️ SPEEL AF
-    window.open(trackUrl, "_blank");
+  iframe.src = embedUrl + "?autoplay=1";
+  iframe.style.display = "block";
 
-    // ✅ update centrale state
-    await sb
-      .from("game_state")
-      .update({
-        scan_open: false,
-        last_played_scan_event_id: ev.id
-      })
-      .eq("id", 1);
+  await sb.from("game_state").update({
+    scan_open: false,
+    last_played_scan_event_id: ev.id
+  }).eq("id", 1);
 
-    scanOpen = false;
-    lastPlayedScanEventId = ev.id;
+  scanOpen = false;
+  lastPlayedScanEventId = ev.id;
 
-    updateUI();
-    handlePolling();
+  updateUI();
+  handlePolling();
 
-    statusEl.textContent = "🎵 Spotify gestart – scan gesloten";
-  }
+  statusEl.textContent = "🎵 Nummer gestart – scan gesloten";
+}
 
-  function handlePolling() {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-    }
-    if (scanOpen) {
-      pollTimer = setInterval(checkLatestFromScanEvents, CHECK_INTERVAL);
-    }
-  }
 
   /* ---------------- init ---------------- */
   await loadGameState();
