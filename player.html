@@ -96,7 +96,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 /* ===========================
    REVEAL (HOOFDSCHERM)
 =========================== */
-async function revealAnswer() {
+window.revealAnswer = async function () {
   const { data, error } = await sb
     .from("scan_events")
     .select("title, artist, year")
@@ -119,14 +119,18 @@ async function revealAnswer() {
       updated_at: new Date()
     })
     .eq("id", 1);
-}
 
-async function hideAnswer() {
+  console.log("✅ Antwoord getoond op screen");
+};
+
+window.hideAnswer = async function () {
   await sb
     .from("game_reveal")
     .update({ visible: false })
     .eq("id", 1);
-}
+
+  console.log("🙈 Antwoord verborgen");
+};
 
 
 
