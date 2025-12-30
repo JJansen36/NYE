@@ -51,41 +51,60 @@
   <button id="scanBtn">📷 Scan QR-code</button>
 
   <script>
-    const info = document.getElementById("info");
-    const scanBtn = document.getElementById("scanBtn");
+  const info = document.getElementById("info");
+  const scanBtn = document.getElementById("scanBtn");
 
-    scanBtn.addEventListener("click", async () => {
-      info.textContent = "📡 Scannen gestart…";
+  let busy = false;
 
-      // 🔧 Simpele testinput (later vervangbaar door echte QR-scan)
-      const scannedCode = prompt("Plak of scan de Spotify link / code:");
+  scanBtn.addEventListener("click", async () => {
+    if (busy) return;
+    busy = true;
 
-      if (!scannedCode) {
-        info.textContent = "❌ Geen code gescand";
-        info.className = "status error";
-        return;
-      }
+    info.textContent = "📡 Scannen gestart…";
+    info.className = "status";
 
-      // 👉 Insert rechtstreeks in scan_events
-      const { error } = await window.sb
-        .from("scan_events")
-        .insert({
-          code: scannedCode,
-          source: "scan",
-          created_at: new Date().toISOString()
-        });
+    // 🔧 Testinput (later echte QR-scan)
+    const scannedCode = prompt("Plak of scan de Spotify link:");
 
-      if (error) {
-        console.error(error);
-        info.textContent = "❌ Fout bij opslaan";
-        info.className = "status error";
-        return;
+    if (!scannedCode) {
+      info.textContent = "❌ Geen code gescand";
+      info.className = "status error";
+      busy = false;
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        "https://wjyvleduvjjseunakmcb.functions.supabase.co/spotify-track",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            code: scannedCode
+          })
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error(err);
+        throw new Error(err.error || "Edge error");
       }
 
       info.textContent = "✅ Scan ontvangen! Wacht op de quiz…";
       info.className = "status ok";
-    });
-  </script>
+    } catch (err) {
+      console.error(err);
+      info.textContent = "❌ Fout bij opslaan";
+      info.className = "status error";
+    } finally {
+      busy = false;
+    }
+  });
+</script>
+
 
 </body>
 </html>
