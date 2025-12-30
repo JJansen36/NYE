@@ -122,50 +122,38 @@
         .eq("id", 1);
     }
 
-    async function pollForScan() {
-      if (!scanOpen) return;
+async function pollForScan() {
+  if (!scanOpen) return;
 
-      const { data: ev } = await sb
-        .from("scan_events")
-        .select("id, created_at, code")
-        .gt("id", lastPlayedScanEventId)
-        .order("id", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  const { data: ev } = await sb
+    .from("scan_events")
+    .select("id, created_at, code")
+    .gt("id", lastPlayedScanEventId)
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-      if (!ev) return;
-      if (!isRecent(ev.created_at)) return;
-      if (!ev.code) return;
+  if (!ev) return;
+  if (!isRecent(ev.created_at)) return;
+  if (!ev.code) return;
 
-      // 🔑 haal Spotify-link uit scan.html?code=
-      let spotifyUrl;
-      try {
-        const wrapper = new URL(ev.code);
-        spotifyUrl = wrapper.searchParams.get("code");
-      } catch {
-        return;
-      }
+  // 🎵 GEWOON DE SPOTIFY-LINK OPENEN
+  if (spotifyTab && !spotifyTab.closed) {
+    spotifyTab.location.href = ev.code;
+    spotifyTab.focus();
+  }
 
-      if (!spotifyUrl || !spotifyUrl.startsWith("https://open.spotify.com/")) {
-        return;
-      }
+  await sb.from("game_state").update({
+    scan_open: false,
+    last_played_scan_event_id: ev.id
+  }).eq("id", 1);
 
-      // 🎵 Spotify starten
-      if (spotifyTab && !spotifyTab.closed) {
-        spotifyTab.location.href = spotifyUrl;
-        spotifyTab.focus();
-      }
+  lastPlayedScanEventId = ev.id;
+  closeScan();
 
-      await sb.from("game_state").update({
-        scan_open: false,
-        last_played_scan_event_id: ev.id
-      }).eq("id", 1);
+  statusEl.textContent = "🎵 Nummer gestart";
+}
 
-      lastPlayedScanEventId = ev.id;
-      closeScan();
-
-      statusEl.textContent = "🎵 Nummer gestart";
-    }
 
     function startPolling() {
       stopPolling();
