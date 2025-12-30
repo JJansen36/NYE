@@ -113,17 +113,16 @@ async function renderTrackPreview() {
 // Vraag activeren
 // -------------------------------
 async function activateQuestion() {
-  if (!activeTeamId) return alert("Geen actieve scan");
-
   await sb
     .from("quiz_state")
     .update({
-      active_team_id: activeTeamId,
-      active_category: $("category").value,
-      active_scan_event_id: lastScanPerTeam[activeTeamId].id,
+      pending_category: $("category").value,
+      active_scan_event_id: null,
       show_answer: false
     })
     .eq("id", 1);
+
+  alert("Categorie klaar! Laat nu scannen.");
 }
 
 // -------------------------------
