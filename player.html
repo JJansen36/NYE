@@ -190,7 +190,19 @@
 
     window.open(`https://open.spotify.com/track/${trackId}`, "_blank");
     statusEl.textContent = "🎵 Spotify nummer gestart (via scan_events)";
+
+    
+    // 🔒 AUTOMATISCH SCAN SLUITEN
+    await sb
+      .from("game_state")
+      .update({ scan_open: false })
+      .eq("id", 1);
+
+    scanOpen = false;
+    handlePolling();
+    updateUI();
   }
+  
 
   function handlePolling() {
     if (pollTimer) {
