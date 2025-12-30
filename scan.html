@@ -70,6 +70,17 @@ function setStatus(msg, cls = "muted") {
   statusEl.textContent = msg;
   statusEl.className = cls;
 }
+// 1️⃣ scan_event opslaan
+const { data: scan, error: scanErr } = await sb
+  .from("scan_events")
+  .insert({ code })
+  .select()
+  .single();
+
+if (scanErr || !scan) {
+  setStatus("❌ Scan opslaan mislukt", "bad");
+  return;
+}
 
 /* ===========================
    CORE LOGIC
@@ -116,7 +127,7 @@ async function registerCode(rawText) {
     setStatus("❌ Deze QR is al gebruikt", "bad");
     return;
   }
-  
+
   // Check of er een categorie klaarstaat
   const { data: state } = await sb
     .from("quiz_state")
