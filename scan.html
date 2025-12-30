@@ -96,17 +96,19 @@ async function registerCode(rawText) {
 
   // 🔗 EDGE FUNCTION regelt ALLES (scan_event + spotify)
   const res = await fetch(EDGE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": sb.supabaseKey
-    },
-    body: JSON.stringify({
-      code,
-      spotify_url: code,
-      url: code
-    })
-  });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "apikey": sb.supabaseKey,
+    "Authorization": `Bearer ${sb.supabaseKey}` // 🔑 DIT WAS DE MISSENDE
+  },
+  body: JSON.stringify({
+    code,
+    spotify_url: code,
+    url: code
+  })
+});
+
 
   if (!res.ok) {
     setStatus("❌ Scan kon niet worden opgeslagen", "bad");
