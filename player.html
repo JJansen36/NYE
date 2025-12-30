@@ -1,147 +1,139 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="nl">
 <head>
-  <meta charset="UTF-8" />
-  <title>Player</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Game Player</title>
 
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-    html, body {
+    body {
       margin: 0;
-      padding: 0;
-      background: #000;
-      color: #fff;
-      height: 100%;
       font-family: system-ui, sans-serif;
+      background: radial-gradient(circle at top, #1a1a24, #000);
+      color: #fff;
+      height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
-    #screen {
+    .player {
+      width: 420px;
+      max-width: 92vw;
       text-align: center;
-      cursor: pointer;
-      font-size: 32px;
-      user-select: none;
     }
 
-    .hint {
-      margin-top: 12px;
-      font-size: 18px;
-      opacity: 0.7;
+    h1 {
+      margin-bottom: 16px;
     }
 
-    .armed {
-      color: #4ade80;
+    iframe {
+      width: 100%;
+      height: 152px;
+      border: none;
+      border-radius: 12px;
+      background: #000;
+      margin-bottom: 12px;
     }
 
-    .blocked {
-      color: #f87171;
+    .status {
+      font-size: 14px;
+      opacity: 0.85;
     }
   </style>
 </head>
+
 <body>
 
-<div id="screen">
-  🔒 Scan uitgeschakeld
-  <div class="hint">Klik om scan te activeren</div>
+<div class="player">
+  <h1>🎮 Game Player</h1>
+
+  <iframe
+    id="spotifyPlayer"
+    allow="autoplay; clipboard-write; encrypted-media">
+  </iframe>
+
+  <div class="status" id="status">⏳ wachten op nummer…</div>
 </div>
 
-<script>
-const sb = supabase.createClient(
-  "https://wjvleduvvjjseunakmcb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
-);
+<!-- ==========================
+     PLAYER SCRIPT (MODULE)
+     ========================== -->
+<script type="module">
+  import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./js/config.js";
 
-const ACTIVE_WINDOW = 5000; // 5 seconden om te scannen
+  const sb = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
 
-let lastCode = null;
-let activeUntil = 0;
-let enabled = false;
+  const MAX_AGE_MINUTES = 2;
+  const CHECK_INTERVAL = 5000;
+  let currentTrackId = null;
 
-const screen = document.getElementById("screen");
-
-// 🔓 Klik = scan activeren (1x)
-screen.addEventListener("click", () => {
-
-  // Eerste klik: Spotify popup permissie
-  if (!enabled) {
-    enabled = true;
+  function isYoungerThanMinutes(dateString, minutes) {
+    return Date.now() - new Date(dateString).getTime() <= minutes * 60 * 1000;
   }
 
-  // Scan activeren
-  sessionStorage.setItem("scan_armed", "1");
-  activeUntil = Date.now() + ACTIVE_WINDOW;
-
-  screen.innerHTML = `
-    🟢 Scan nu een kaart
-    <div class="hint">Nog ${ACTIVE_WINDOW / 1000} seconden</div>
-  `;
-  screen.className = "armed";
-});
-
-// 🔁 Check op nieuwe scan
-async function checkLatest() {
-  if (!enabled) return;
-  if (sessionStorage.getItem("scan_armed") !== "1") return;
-
-  const { data } = await sb
-    .from("scan_events")
-    .select("code, created_at")
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (!data || data.length === 0) return;
-
-  const latest = data[0];
-
-  // 👉 nieuwe scan
-  if (latest.code !== lastCode) {
-    lastCode = latest.code;
-
-    // ❗ scan verbruikt → meteen weer blokkeren
-    sessionStorage.removeItem("scan_armed");
-    activeUntil = 0;
-
-    screen.innerHTML = `
-      ▶️ Klik om Spotify te openen
-      <div class="hint">Scan ontvangen</div>
-    `;
-    screen.className = "";
-  }
-}
-
-// 🔁 Countdown / timeout
-function updateCountdown() {
-  if (sessionStorage.getItem("scan_armed") !== "1") return;
-
-  const remaining = activeUntil - Date.now();
-  if (remaining <= 0) {
-    sessionStorage.removeItem("scan_armed");
-    screen.innerHTML = `
-      🔒 Scan verlopen
-      <div class="hint">Klik om opnieuw te activeren</div>
-    `;
-    screen.className = "blocked";
-    return;
+  function stopPlayback(message) {
+    document.getElementById("spotifyPlayer").src = "";
+    document.getElementById("status").textContent = message;
   }
 
-  const sec = Math.ceil(remaining / 1000);
-  const hint = screen.querySelector(".hint");
-  if (hint) hint.innerText = `Nog ${sec} seconden`;
-}
+  async function isScanOpen() {
+    const { data, error } = await sb
+      .from("game_state")
+      .select("scan_open")
+      .eq("id", 1)
+      .single();
 
-// ▶️ Spotify openen (alleen na geldige scan)
-screen.addEventListener("dblclick", () => {
-  if (!lastCode) return;
-  window.open(lastCode, "_blank");
-});
+    if (error || !data) return false;
+    return data.scan_open === true;
+  }
 
-// polling
-setInterval(checkLatest, 2000);
-setInterval(updateCountdown, 500);
+  async function loadLatestTrack() {
+    if (!(await isScanOpen())) {
+      stopPlayback("⛔ scan is gesloten");
+      currentTrackId = null;
+      return;
+    }
+
+    const { data, error } = await sb
+      .from("spotify_tracks")
+      .select("spotify_uri, created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      stopPlayback("⏳ wachten op nummer…");
+      currentTrackId = null;
+      return;
+    }
+
+    if (!isYoungerThanMinutes(data.created_at, MAX_AGE_MINUTES)) {
+      stopPlayback("⌛ laatste nummer is verlopen");
+      currentTrackId = null;
+      return;
+    }
+
+    const trackId = data.spotify_uri?.split(":")[2];
+    if (!trackId || trackId === currentTrackId) return;
+
+    currentTrackId = trackId;
+
+    document.getElementById("spotifyPlayer").src =
+      `https://open.spotify.com/embed/track/${trackId}?autoplay=1`;
+
+    document.getElementById("status").textContent =
+      "▶️ Nu aan het afspelen";
+  }
+
+  loadLatestTrack();
+  setInterval(loadLatestTrack, CHECK_INTERVAL);
 </script>
 
 </body>
