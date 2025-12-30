@@ -3,53 +3,73 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Quiz — Hoofdscherm</title>
-  <link rel="stylesheet" href="css/styles.css" />
+  <title>Spotify Quiz — Hoofdscherm</title>
+  <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
 </head>
 <body>
-
-
-  <div id="activeQuestion" class="active-question">
-  <div id="activeCategory" class="muted"></div>
-  <h2 id="activeQuestionText">Wachten op vraag…</h2>
-</div>
-
-  <div class="topbar">
-    <div class="topbar-left">
-      <div class="badge">Hoofdscherm</div>
-      <div id="status" class="status">...</div>
-    </div>
-    <div class="topbar-right">
-      <select id="gameSelect" class="input" style="min-width: 220px"></select>
-      <button id="btnUseGame" class="btn">Use game</button>
-      <a class="btn" href="admin.html">Admin</a>
-    </div>
-  </div>
-
-  <div class="layout-tv">
-    <section class="side-panel">
-      <div class="team-title" id="team1Name">Team 1</div>
-      <div class="score" id="team1Score">0</div>
-    </section>
-
-    <main class="center-panel">
-      <div class="question-meta">
-        <span class="pill" id="catPill">—</span>
-        <span class="muted" id="qId">—</span>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">🎵</div>
+        <div>
+          <div class="h1">Spotify Quiz — Hoofdscherm</div>
+          <div class="sub">Realtime via Supabase • open <span class="kbd">admin.html</span> om te sturen</div>
+        </div>
       </div>
-      <div class="question" id="questionText">Wacht op actieve vraag…</div>
-      <div class="muted" id="mediaUrl"></div>
-      <div class="divider"></div>
-      <div class="muted" id="hint">Tip: laat admin een game activeren en laat teams QR’s scannen.</div>
-    </main>
+      <div class="sub" id="status">Verbinden…</div>
+    </div>
 
-    <section class="side-panel">
-      <div class="team-title" id="team2Name">Team 2</div>
-      <div class="score" id="team2Score">0</div>
-    </section>
+    <div class="grid">
+      <div class="card teamCard">
+        <div>
+          <div class="teamName" id="team1Name">Team 1</div>
+          <div class="sub">Score</div>
+          <div class="score" id="team1Score">0</div>
+        </div>
+        <div class="small">Tip: fullscreen op TV</div>
+      </div>
+
+      <div class="card centerCard">
+        <div class="badge" id="catBadge">Geen vraag actief</div>
+        <div class="question" id="questionText">Wacht op admin…</div>
+
+        <div class="mediaWrap" id="mediaWrap" style="display:none;">
+          <img id="artistPhoto" class="artistPhoto" alt="Artiest foto" />
+          <audio id="audio" preload="auto"></audio>
+        </div>
+
+        <div class="answer" id="answerBox"></div>
+        <div class="meta" id="metaText"></div>
+      </div>
+
+      <div class="card teamCard">
+        <div style="text-align:right">
+          <div class="teamName" id="team2Name">Team 2</div>
+          <div class="sub">Score</div>
+          <div class="score" id="team2Score">0</div>
+        </div>
+        <div class="small" style="text-align:right">Audio kan 1x “enable” nodig hebben</div>
+      </div>
+    </div>
   </div>
 
-  <script type="module" src="js/main.js"></script>
+  <!-- Audio enable overlay (autoplay restrictions) -->
+  <div class="overlay" id="audioOverlay">
+    <div class="overlayCard">
+      <div style="font-size:18px;font-weight:900;">Audio inschakelen</div>
+      <div class="sub" style="margin-top:6px;">
+        Browsers blokkeren autoplay. Klik 1x om intro’s automatisch te laten spelen.
+      </div>
+      <div class="controls" style="justify-content:center;margin-top:12px;">
+        <button class="primary" id="enableAudioBtn">✅ Enable audio</button>
+      </div>
+      <hr class="sep"/>
+      <div class="small">Daarna kun je dit scherm fullscreen zetten.</div>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
 </body>
 </html>
