@@ -25,17 +25,13 @@
     }
     .status {
       margin-top: 16px;
-      opacity: 0.8;
+      opacity: 0.85;
     }
-    .error {
-      color: #f87171;
-    }
-    .ok {
-      color: #4ade80;
-    }
+    .error { color: #f87171; }
+    .ok { color: #4ade80; }
   </style>
 
-  <!-- Supabase client -->
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js"></script>
 </head>
@@ -51,37 +47,36 @@
   <button id="scanBtn">📷 Scan QR-code</button>
 
   <script>
-  const info = document.getElementById("info");
-  const scanBtn = document.getElementById("scanBtn");
+    const info = document.getElementById("info");
+    const scanBtn = document.getElementById("scanBtn");
 
-  scanBtn.addEventListener("click", async () => {
-    info.textContent = "📡 Scannen gestart…";
+    scanBtn.onclick = async () => {
+      info.textContent = "📡 Scannen gestart…";
 
-    const scannedCode = prompt("Plak of scan de Spotify link:");
-    if (!scannedCode) {
-      info.textContent = "❌ Geen code gescand";
-      return;
-    }
-
-    // ✅ DIT is de juiste manier
-    const { data, error } = await window.sb.functions.invoke(
-      "clever-api",
-      {
-        body: { code: scannedCode }
+      const code = prompt("Plak of scan de Spotify link:");
+      if (!code) {
+        info.textContent = "❌ Geen code gescand";
+        info.className = "status error";
+        return;
       }
-    );
 
-    if (error) {
-      console.error(error);
-      info.textContent = "❌ Fout bij opslaan";
-      return;
-    }
+      // ✅ ENIGE JUISTE MANIER
+      const { data, error } = await window.sb.functions.invoke(
+        "clever-api",
+        { body: { code } }
+      );
 
-    info.textContent = "✅ Scan ontvangen! Wacht op de quiz…";
-  });
-</script>
+      if (error) {
+        console.error(error);
+        info.textContent = "❌ Fout bij opslaan";
+        info.className = "status error";
+        return;
+      }
 
-
+      info.textContent = "✅ Scan ontvangen! Wacht op de quiz…";
+      info.className = "status ok";
+    };
+  </script>
 
 </body>
 </html>
