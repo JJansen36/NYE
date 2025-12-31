@@ -83,13 +83,72 @@ img {
   height: 6px;
   background: gold;
   border-radius: 50%;
-  animation: fly 900ms ease-out forwards;
+  animation: fly 1600ms ease-out forwards;
 }
 
+
 @keyframes fly {
-  from { transform: translate(0,0) scale(1); opacity: 1; }
-  to   { transform: translate(var(--x), var(--y)) scale(0); opacity: 0; }
+  from {
+    transform: translate(0,0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--x), var(--y)) scale(0.4);
+    opacity: 0;
+  }
 }
+
+.points {
+  font-size: 90px;
+  font-weight: 800;
+  transition:
+    transform 0.6s ease-out,
+    text-shadow 0.6s ease-out;
+}
+
+.points.big {
+  transform: scale(1.25);
+  text-shadow:
+    0 0 25px #ffd700,
+    0 0 50px #ff9f1c,
+    0 0 70px #ff4d00;
+}
+
+.points.mega {
+  transform: scale(1.45);
+  text-shadow:
+    0 0 35px #ffd700,
+    0 0 70px #ff9f1c,
+    0 0 110px #ff4d00,
+    0 0 160px #ffffff;
+}
+
+
+/* flash effect */
+.flash {
+  animation: flash-bg 300ms ease-out;
+}
+
+@keyframes flash-bg {
+  from { background: rgba(255,215,0,0.25); }
+  to   { background: transparent; }
+}
+
+.score.leader {
+  box-shadow:
+    0 0 25px rgba(255,215,0,0.4),
+    0 0 60px rgba(255,159,28,0.35);
+  border-radius: 16px;
+  animation: leaderGlow 2s ease-in-out infinite;
+}
+
+@keyframes leaderGlow {
+  0%   { box-shadow: 0 0 20px rgba(255,215,0,0.3); }
+  50%  { box-shadow: 0 0 60px rgba(255,159,28,0.6); }
+  100% { box-shadow: 0 0 20px rgba(255,215,0,0.3); }
+}
+
+
 </style>
 </head>
 
@@ -104,7 +163,7 @@ img {
 
   <!-- MIDDEN -->
   <div class="center">
-    <button onclick="loadTrack()">Toon laatste scan</button>
+    <button onclick="loadTrack(); unlockAudio();">Toon laatste scan</button>
     <img id="cover" style="display:none" />
     <div class="artist" id="artist"></div>
     <div class="title" id="title"></div>
@@ -124,6 +183,36 @@ const sb = supabase.createClient(
   "https://wjvleduvvjjseunakmcb.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
 );
+
+let lastScores = {
+  1: null,
+  2: null
+};
+
+let audioUnlocked = false;
+
+function unlockAudio() {
+  if (audioUnlocked) return;
+
+  sndWhoosh.muted = true;
+  sndBoom.muted = true;
+
+  sndWhoosh.play().catch(() => {});
+  sndBoom.play().catch(() => {});
+
+  sndWhoosh.pause();
+  sndBoom.pause();
+
+  sndWhoosh.currentTime = 0;
+  sndBoom.currentTime = 0;
+
+  sndWhoosh.muted = false;
+  sndBoom.muted = false;
+
+  audioUnlocked = true;
+  console.log("🔊 Audio unlocked");
+}
+
 
 document.addEventListener("DOMContentLoaded", () => {
   loadScores();        // 👈 haalt huidige stand op
@@ -168,14 +257,55 @@ async function loadScores() {
     .select("id, points");
 
   data.forEach(row => {
-    if (row.id === 1) {
-      document.getElementById("team1").innerText = row.points;
+    const teamId = row.id;
+    const newValue = row.points;
+
+    const el = document.getElementById(teamId === 1 ? "team1" : "team2");
+    const oldValue = lastScores[teamId];
+
+    // eerste keer → alleen tonen
+    if (oldValue === null) {
+      el.innerText = newValue;
+      lastScores[teamId] = newValue;
+      return;
     }
-    if (row.id === 2) {
-      document.getElementById("team2").innerText = row.points;
+
+    if (oldValue !== newValue) {
+      const delta = Math.abs(newValue - oldValue);
+
+      el.innerText = newValue;
+
+      // reset classes
+      el.classList.remove("pulse", "big", "mega");
+
+if (delta >= 10) {
+  el.classList.add("mega");
+  burst(el, 50);
+  screenFlash(3);
+  play(sndBoom);      // 🔊 BOOM
+}
+else if (delta >= 5) {
+  el.classList.add("big");
+  burst(el, 25);
+  play(sndWhoosh);   // 🔊 WHOOSH
+}
+else {
+  el.classList.add("pulse");
+  burst(el, 10);
+}
+
+      setTimeout(() => {
+        el.classList.remove("pulse", "big", "mega");
+      }, 900);
+
+      lastScores[teamId] = newValue;
+    updateLeader();
+
     }
   });
 }
+
+
 
 // realtime subscription
 function subscribeScores() {
@@ -217,18 +347,39 @@ function updateScore(teamId, newValue, animate) {
 }
 
 // 🎆 mini confetti burst
-function burst(el) {
-  for (let i = 0; i < 12; i++) {
+function burst(el, amount = 12) {
+  for (let i = 0; i < amount; i++) {
     const c = document.createElement("div");
     c.className = "confetti";
-    c.style.left = el.getBoundingClientRect().left + el.offsetWidth / 2 + "px";
-    c.style.top  = el.getBoundingClientRect().top + el.offsetHeight / 2 + "px";
-    c.style.setProperty("--x", `${Math.random()*120-60}px`);
-    c.style.setProperty("--y", `${Math.random()*-120}px`);
+    c.style.left =
+      el.getBoundingClientRect().left + el.offsetWidth / 2 + "px";
+    c.style.top =
+      el.getBoundingClientRect().top + el.offsetHeight / 2 + "px";
+    c.style.setProperty("--x", `${Math.random() * 240 - 120}px`);
+    c.style.setProperty("--y", `${Math.random() * -240}px`);
     document.body.appendChild(c);
     setTimeout(() => c.remove(), 900);
   }
 }
+
+function screenFlash(times = 3) {
+  let count = 0;
+
+  const flashOnce = () => {
+    document.body.classList.add("flash");
+    setTimeout(() => {
+      document.body.classList.remove("flash");
+    }, 300);
+
+    count++;
+    if (count < times) {
+      setTimeout(flashOnce, 450); // tempo tussen flashes
+    }
+  };
+
+  flashOnce();
+}
+
 
 console.log("Realtime test start");
 
@@ -244,13 +395,45 @@ sb.channel("test")
     console.log("Realtime status:", status);
   });
 
+
+  function updateLeader() {
+  const s1 = Number(document.getElementById("team1").innerText);
+  const s2 = Number(document.getElementById("team2").innerText);
+
+  const t1 = document.querySelector(".score:nth-child(1)");
+  const t2 = document.querySelector(".score:nth-child(3)");
+
+  t1.classList.remove("leader");
+  t2.classList.remove("leader");
+
+  if (s1 > s2) t1.classList.add("leader");
+  else if (s2 > s1) t2.classList.add("leader");
+}
+
+
+
+const sndWhoosh = document.getElementById("sndWhoosh");
+const sndBoom   = document.getElementById("sndBoom");
+
+function play(sound) {
+  if (!audioUnlocked || !sound) return;
+
+  sound.currentTime = 0;
+  sound.play().catch(() => {});
+}
+
   // direct laden
 loadScores();
 
 // elke seconde opnieuw ophalen (quasi realtime)
 setInterval(loadScores, 1000);
 
-
 </script>
+
+<audio id="sndWhoosh" src="whoosh.mp3" preload="auto"></audio>
+<audio id="sndBoom" src="boom.mp3" preload="auto"></audio>
+
+
+
 </body>
 </html>
