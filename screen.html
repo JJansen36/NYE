@@ -167,7 +167,14 @@ async function loadScores() {
     .from("team_scores")
     .select("id, points");
 
-  data.forEach(row => updateScore(row.id, row.points, false));
+  data.forEach(row => {
+    if (row.id === 1) {
+      document.getElementById("team1").innerText = row.points;
+    }
+    if (row.id === 2) {
+      document.getElementById("team2").innerText = row.points;
+    }
+  });
 }
 
 // realtime subscription
@@ -236,6 +243,13 @@ sb.channel("test")
   .subscribe(status => {
     console.log("Realtime status:", status);
   });
+
+  // direct laden
+loadScores();
+
+// elke seconde opnieuw ophalen (quasi realtime)
+setInterval(loadScores, 1000);
+
 
 </script>
 </body>
