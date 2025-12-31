@@ -3,108 +3,75 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Spotify Quiz — Admin</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Admin – Scores</title>
 
-  <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f14;
+      color: #fff;
+      padding: 24px;
+    }
+
+    .box {
+      max-width: 360px;
+      margin: auto;
+    }
+
+    h2 { margin-top: 24px; }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      font-size: 18px;
+      margin-top: 8px;
+      border-radius: 10px;
+      border: none;
+    }
+
+    button {
+      margin-top: 16px;
+      width: 100%;
+      padding: 14px;
+      font-size: 18px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
 </head>
 
 <body>
-  <div class="container">
-    <div class="topbar">
-      <div class="brand">
-        <div class="logo">🛠️</div>
-        <div>
-          <div class="h1">Spotify Quiz — Admin</div>
-          <div class="sub">Start vragen • Toon antwoord • Score aanpassen</div>
-        </div>
-      </div>
-      <div class="sub" id="status">Verbinden…</div>
-    </div>
+  <div class="box">
 
-    <div class="grid" style="grid-template-columns: 1.2fr 1fr 1fr;">
-      <!-- VRAAG -->
-      <div class="card">
-        <div class="h2">Vraag</div>
+    <h2>Team 1</h2>
+    <input type="number" id="t1" />
+    <button onclick="save(1)">Opslaan</button>
 
-        <label class="small">Categorie</label>
-        <select id="category" class="input">
-          <option value="year">1) Jaartal</option>
-          <option value="artist_title">2) Artiest - Titel</option>
-          <option value="intro">3) Intro (5 sec audio)</option>
-          <option value="photo">4) Foto (vaag → helder)</option>
-        </select>
+    <h2>Team 2</h2>
+    <input type="number" id="t2" />
+    <button onclick="save(2)">Opslaan</button>
 
-        <div class="row" style="margin-top:10px">
-          <button class="primary" id="pickRandom">🎲 Random track</button>
-          <button id="activate">✅ Activeer vraag</button>
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <button id="toggleAnswer">👁️ Toon / verberg antwoord</button>
-          <button class="danger" id="clearQuestion">🧹 Clear vraag</button>
-        </div>
-
-        <hr class="sep"/>
-
-        <div class="small">Geselecteerde track</div>
-        <div id="trackTitle" class="bold">—</div>
-        <div id="trackMeta" class="sub">—</div>
-
-        <div class="small" style="margin-top:10px">Voorbeeld vraag</div>
-        <div id="previewQ" class="bold">—</div>
-
-        <div class="small" style="margin-top:6px">Antwoord</div>
-        <div id="previewA" class="bold accent">—</div>
-      </div>
-
-      <!-- TEAM LINKS -->
-      <div class="card">
-        <div class="h2">Team Links</div>
-        <input id="t1Name" class="input" placeholder="Teamnaam" />
-        <input id="t1Score" class="input" type="number" placeholder="Score" />
-
-        <div class="controls">
-          <button data-team="1" data-delta="1" class="primary">+1</button>
-          <button data-team="1" data-delta="-1">-1</button>
-          <button data-team="1" data-delta="5" class="primary">+5</button>
-          <button data-team="1" data-delta="-5">-5</button>
-          <button data-save="1">💾 Opslaan</button>
-        </div>
-      </div>
-
-      <!-- TEAM RECHTS -->
-      <div class="card">
-        <div class="h2">Team Rechts</div>
-        <input id="t2Name" class="input" placeholder="Teamnaam" />
-        <input id="t2Score" class="input" type="number" placeholder="Score" />
-
-        <div class="controls">
-          <button data-team="2" data-delta="1" class="primary">+1</button>
-          <button data-team="2" data-delta="-1">-1</button>
-          <button data-team="2" data-delta="5" class="primary">+5</button>
-          <button data-team="2" data-delta="-5">-5</button>
-          <button data-save="2">💾 Opslaan</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <div class="row">
-        <div>
-          <div class="h2">Nieuw spel</div>
-          <div class="sub">Reset scores en actieve vraag</div>
-        </div>
-        <button class="danger" id="resetGame">🧨 Reset game</button>
-      </div>
-    </div>
   </div>
 
-  <!-- Global Supabase client -->
-  <script src="supabase.js"></script>
+<script>
+  const sb = supabase.createClient(
+    "https://wjvleduvvjjseunakmcb.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
+  );
 
-  <!-- Admin logic -->
-  <script src="admin.js"></script>
+  async function save(teamId) {
+    const value = document.getElementById(teamId === 1 ? "t1" : "t2").value;
+
+    await sb
+      .from("team_scores")
+      .update({ points: Number(value) })
+      .eq("id", teamId);
+
+    alert("Score opgeslagen");
+  }
+</script>
 </body>
 </html>

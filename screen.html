@@ -1,97 +1,242 @@
 <!doctype html>
 <html lang="nl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>🎵 Quiz Antwoord</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NYE Quiz Screen</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <style>
-    body {
-      margin: 0;
-      background: #000;
-      color: #fff;
-      font-family: system-ui, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      overflow: hidden;
-    }
+<style>
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #1a1a2e, #000);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
 
-    .card {
-      text-align: center;
-      opacity: 0;
-      transform: scale(0.95);
-      transition: opacity 0.6s ease, transform 0.6s ease;
-    }
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  width: 95vw;
+  max-width: 1400px;
+  align-items: center;
+}
 
-    .card.show {
-      opacity: 1;
-      transform: scale(1);
-    }
+.score {
+  text-align: center;
+}
 
-    .title {
-      font-size: 64px;
-      font-weight: 700;
-    }
+.score h2 {
+  font-size: 24px;
+  opacity: .85;
+  margin-bottom: 12px;
+}
 
-    .artist {
-      font-size: 48px;
-      margin-top: 16px;
-      opacity: 0.9;
-    }
+.points {
+  font-size: 90px;
+  font-weight: 800;
+  transition: transform .3s ease, text-shadow .3s ease;
+}
 
-    .year {
-      font-size: 40px;
-      margin-top: 12px;
-      opacity: 0.7;
-    }
-  </style>
+.points.pulse {
+  transform: scale(1.15);
+  text-shadow:
+    0 0 10px #ffd700,
+    0 0 25px #ff9f1c;
+}
+
+.center {
+  text-align: center;
+}
+
+button {
+  padding: 12px 20px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 24px;
+}
+
+img {
+  width: 360px;
+  max-width: 80vw;
+  border-radius: 18px;
+  margin-bottom: 20px;
+  box-shadow: 0 25px 60px rgba(0,0,0,.6);
+}
+
+.artist { font-size: 28px; font-weight: 600; }
+.title  { font-size: 22px; margin-top: 6px; }
+.year   { font-size: 16px; opacity: .7; }
+
+/* 🎆 Confetti dots */
+.confetti {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: gold;
+  border-radius: 50%;
+  animation: fly 900ms ease-out forwards;
+}
+
+@keyframes fly {
+  from { transform: translate(0,0) scale(1); opacity: 1; }
+  to   { transform: translate(var(--x), var(--y)) scale(0); opacity: 0; }
+}
+</style>
 </head>
 
 <body>
+<div class="layout">
 
-<div id="card" class="card">
-  <div class="title" id="title"></div>
-  <div class="artist" id="artist"></div>
-  <div class="year" id="year"></div>
+  <!-- TEAM 1 -->
+  <div class="score">
+    <h2>Team 1</h2>
+    <div class="points" id="team1">0</div>
+  </div>
+
+  <!-- MIDDEN -->
+  <div class="center">
+    <button onclick="loadTrack()">Toon laatste scan</button>
+    <img id="cover" style="display:none" />
+    <div class="artist" id="artist"></div>
+    <div class="title" id="title"></div>
+    <div class="year" id="year"></div>
+  </div>
+
+  <!-- TEAM 2 -->
+  <div class="score">
+    <h2>Team 2</h2>
+    <div class="points" id="team2">0</div>
+  </div>
+
 </div>
 
-<script type="module">
-/* ===========================
-   SUPABASE
-=========================== */
-const SUPABASE_URL = "https://wjvleduvvjjseunakmcb.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0";
+<script>
+const sb = supabase.createClient(
+  "https://wjvleduvvjjseunakmcb.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdmxlZHV2dmpqc2V1bmFrbWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY5NDU0NzYsImV4cCI6MjA4MjUyMTQ3Nn0.9GzBjksztdM4SFw_BcAVKl3gwEzBN0jqNhztQ9m9uj0"
+);
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+document.addEventListener("DOMContentLoaded", () => {
+  loadScores();        // 👈 haalt huidige stand op
+  subscribeScores();  // 👈 luistert realtime
+});
 
-/* ===========================
-   REALTIME LISTENER
-=========================== */
-sb.channel("game-reveal")
+// ==========================
+// INIT
+// ==========================
+loadScores();
+subscribeScores();
+
+// ==========================
+// TRACK
+// ==========================
+async function loadTrack() {
+  const { data } = await sb
+    .from("spotify_tracks")
+    .select("artist, title, release_year, image_url, scan_number")
+    .not("scan_number", "is", null)
+    .order("scan_number", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!data) return;
+
+  const cover = document.getElementById("cover");
+  cover.src = data.image_url;
+  cover.style.display = "block";
+
+  artist.innerText = data.artist;
+  title.innerText = data.title;
+  year.innerText = data.release_year ?? "";
+}
+
+// ==========================
+// SCORES
+// ==========================
+async function loadScores() {
+  const { data } = await sb
+    .from("team_scores")
+    .select("id, points");
+
+  data.forEach(row => updateScore(row.id, row.points, false));
+}
+
+// realtime subscription
+function subscribeScores() {
+  sb.channel("scores")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",              // 🔥 INSERT + UPDATE
+        schema: "public",
+        table: "team_scores"
+      },
+      payload => {
+        updateScore(payload.new.id, payload.new.points, true);
+      }
+    )
+    .subscribe(status => {
+      console.log("Realtime status:", status);
+    });
+}
+
+
+// ==========================
+// SCORE UPDATE + FX
+// ==========================
+function updateScore(teamId, newValue, animate) {
+  const el = document.getElementById(teamId === 1 ? "team1" : "team2");
+  const old = Number(el.innerText);
+
+  if (old === newValue) return;
+
+  el.innerText = newValue;
+
+  if (animate) {
+    el.classList.add("pulse");
+    burst(el);
+
+    setTimeout(() => el.classList.remove("pulse"), 400);
+  }
+}
+
+// 🎆 mini confetti burst
+function burst(el) {
+  for (let i = 0; i < 12; i++) {
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = el.getBoundingClientRect().left + el.offsetWidth / 2 + "px";
+    c.style.top  = el.getBoundingClientRect().top + el.offsetHeight / 2 + "px";
+    c.style.setProperty("--x", `${Math.random()*120-60}px`);
+    c.style.setProperty("--y", `${Math.random()*-120}px`);
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 900);
+  }
+}
+
+console.log("Realtime test start");
+
+sb.channel("test")
   .on(
     "postgres_changes",
-    { event: "UPDATE", schema: "public", table: "game_reveal" },
+    { event: "*", schema: "public", table: "team_scores" },
     payload => {
-      const data = payload.new;
-      const card = document.getElementById("card");
-
-      if (data.visible) {
-        document.getElementById("title").textContent = data.title ?? "";
-        document.getElementById("artist").textContent = data.artist ?? "";
-        document.getElementById("year").textContent = data.year ?? "";
-        card.classList.add("show");
-      } else {
-        card.classList.remove("show");
-      }
+      console.log("🔥 REALTIME EVENT:", payload);
     }
   )
-  .subscribe();
-</script>
+  .subscribe(status => {
+    console.log("Realtime status:", status);
+  });
 
+</script>
 </body>
 </html>
